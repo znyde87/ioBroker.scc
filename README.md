@@ -68,6 +68,8 @@ Details und Datenmodell siehe [CONCEPT.md](CONCEPT.md).
 
 Unter **Adapter-Instanz → Tab „Flow“** gibt es eine grafische Ansicht:
 
+![PV-Überschuss – Energiefluss (Flow-Dashboard)](docs/screenshot-flow.png)
+
 - Haus-Diagramm mit PV, Batterie, Netz, Hausverbrauch
 - Animierte Energiefluss-Linien (grün/rot nach Logik)
 - Live-Werte: Photovoltaik, Last, Batterie, Netz (Einspeisung/Bezug)
