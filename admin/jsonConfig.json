@@ -1,0 +1,235 @@
+{
+  "type": "tabs",
+  "items": {
+    "tab_general": {
+      "type": "panel",
+      "label": "Allgemein",
+      "items": {
+        "surplusThresholdW": {
+          "type": "number",
+          "label": "Schwellwert Überschuss (W)",
+          "min": 0,
+          "max": 100000,
+          "sm": 6,
+          "help": "Ab diesem Brutto-Überschuss gilt „Überschuss aktiv“."
+        },
+        "batteryReserveW": {
+          "type": "number",
+          "label": "Batterie-Reservierung (W)",
+          "min": 0,
+          "max": 50000,
+          "sm": 6,
+          "newLine": true,
+          "help": "Fixe Reservierung für Ladung, wenn keine Ladeleistung-States genutzt werden."
+        },
+        "useBatteryChargePower": {
+          "type": "checkbox",
+          "label": "Ladeleistung aus States nutzen",
+          "sm": 6,
+          "newLine": true,
+          "help": "Wenn aktiv: Ladeleistung pro Batterie aus States abziehen. Sonst: nur batteryReserveW."
+        },
+        "surplusPriority": {
+          "type": "select",
+          "label": "Überschuss-Priorität",
+          "sm": 6,
+          "newLine": true,
+          "options": [
+            { "value": "battery_first", "label": "Batterie zuerst, dann Geräte, Rest ins Netz" },
+            { "value": "devices_first", "label": "Geräte zuerst, dann Batterie, Rest ins Netz" }
+          ],
+          "help": "Batterie zuerst: Speicher wird vor den Schalt-Geräten bedient. Geräte zuerst: Gesamter Überschuss für WP/Steckdosen, Batterie lädt mit dem Rest."
+        },
+        "pollIntervalMs": {
+          "type": "number",
+          "label": "Aktualisierungsintervall (ms)",
+          "min": 500,
+          "max": 60000,
+          "step": 500,
+          "sm": 6,
+          "newLine": true,
+          "help": "Intervall für Berechnung (z. B. 1000 = 1 s)."
+        },
+        "simulationMode": {
+          "type": "checkbox",
+          "label": "Simulationsmodus (nur berechnen, nicht schalten)",
+          "sm": 6,
+          "newLine": true,
+          "help": "Wenn aktiv: Regeln werden ausgewertet, aber keine Geräte geschaltet."
+        },
+        "debugRules": {
+          "type": "checkbox",
+          "label": "Debug-Log für Regeln",
+          "sm": 6,
+          "newLine": true,
+          "help": "Loglevel „debug“ stellen – dann wird ausgegeben, warum eine Regel (noch) nicht schaltet."
+        },
+        "standalonePort": {
+          "type": "number",
+          "label": "Flow als Einzelseite (Port)",
+          "min": 0,
+          "max": 65535,
+          "sm": 6,
+          "newLine": true,
+          "help": "Wenn > 0: Energiefluss-Seite unter http://<Host>:<Port>/flow.html erreichbar (ohne Admin). 0 = aus."
+        },
+        "forecastEnabled": {
+          "type": "checkbox",
+          "label": "PV-Vorhersage aktiv",
+          "sm": 6,
+          "newLine": true,
+          "help": "Vorhersage-Leistung (W) aus einem Datenpunkt lesen und im Flow-Tab anzeigen (z. B. von DWD, Solcast oder anderem Forecast-Adapter)."
+        },
+        "forecastSourceId": {
+          "type": "objectId",
+          "label": "PV-Vorhersage Datenpunkt (Leistung in W oder kW)",
+          "sm": 6,
+          "newLine": true,
+          "customFilter": { "common": { "type": "number" } },
+          "help": "State mit vorhergesagter PV-Leistung (eine Zahl oder Objekt mit powerW/power)."
+        }
+      }
+    },
+    "tab_sources": {
+      "type": "panel",
+      "label": "Quellen",
+      "items": {
+        "_sourcesHelp": {
+          "type": "staticText",
+          "text": "Shelly am Hauptanschluss liefert nur die Netto-Leistung am Zähler (Bezug). Für korrekten Hausverbrauch: entweder „Hausverbrauch aus Bilanz berechnen“ aktivieren (Bezug + Erzeugung + Batterie-Entladung − Einspeisung − Batterie-Ladung) oder einen Datenpunkt für Gesamtverbrauch eintragen.",
+          "newLine": true
+        },
+        "computeConsumptionFromBalance": {
+          "type": "checkbox",
+          "label": "Hausverbrauch aus Bilanz berechnen",
+          "sm": 6,
+          "newLine": true,
+          "help": "Wenn aktiv: Hausverbrauch = Netzbezug + Erzeugung + Batterie-Entladung − Einspeisung − Batterie-Ladung. Sinnvoll, wenn nur Shelly (Netz) + PV als Quellen – der Shelly zeigt sonst nur den Netto-Wert."
+        },
+        "consumptionTotal": {
+          "type": "objectId",
+          "label": "Hausverbrauch gesamt (ein Datenpunkt, optional)",
+          "sm": 6,
+          "newLine": true,
+          "customFilter": { "common": { "type": "number" } },
+          "help": "Nur wenn „Hausverbrauch aus Bilanz berechnen“ aus ist: Hier einen Zähler für den Gesamtverbrauch eintragen. Dann werden die Verbraucher-Zähler unten NICHT addiert (nur Anzeige)."
+        },
+        "consumptionTotalName": {
+          "type": "text",
+          "label": "Name (Alias) für Hausverbrauch",
+          "sm": 6,
+          "placeholder": "Hausverbrauch"
+        },
+        "sourcesGeneration": {
+          "type": "table",
+          "label": "Erzeugung (z. B. PV-Leistung)",
+          "newLine": true,
+          "items": [
+            { "attr": "stateId", "name": "stateId", "type": "objectId", "label": "Datenpunkt", "title": "Datenpunkt", "customFilter": { "common": { "type": "number" } } },
+            { "attr": "name", "name": "name", "type": "text", "label": "Name (Alias)", "title": "Name (Alias)" }
+          ]
+        },
+        "sourcesConsumption": {
+          "type": "table",
+          "label": "Verbrauch (Einzelzähler – Summe ODER Teile von Hausverbrauch gesamt)",
+          "newLine": true,
+          "items": [
+            { "attr": "stateId", "name": "stateId", "type": "objectId", "label": "Datenpunkt", "title": "Datenpunkt", "customFilter": { "common": { "type": "number" } } },
+            { "attr": "name", "name": "name", "type": "text", "label": "Name (Alias)", "title": "Name (Alias)" }
+          ]
+        },
+        "sourcesGrid": {
+          "type": "table",
+          "label": "Netzleistung (z. B. Shelly Hauptanschluss; negativ = Einspeisung)",
+          "newLine": true,
+          "items": [
+            { "attr": "stateId", "name": "stateId", "type": "objectId", "label": "Datenpunkt", "title": "Datenpunkt", "customFilter": { "common": { "type": "number" } } },
+            { "attr": "name", "name": "name", "type": "text", "label": "Name (Alias)", "title": "Name (Alias)" }
+          ]
+        },
+        "sourcesFeedIn": {
+          "type": "table",
+          "label": "Einspeisung",
+          "newLine": true,
+          "items": [
+            { "attr": "stateId", "name": "stateId", "type": "objectId", "label": "Datenpunkt", "title": "Datenpunkt", "customFilter": { "common": { "type": "number" } } },
+            { "attr": "name", "name": "name", "type": "text", "label": "Name (Alias)", "title": "Name (Alias)" }
+          ]
+        }
+      }
+    },
+    "tab_batteries": {
+      "type": "panel",
+      "label": "Batterien",
+      "items": {
+        "_batteriesHelp": {
+          "type": "staticText",
+          "text": "Tabelle 1: SoC (eine Zeile = eine Batterie). Tabelle 2: Ladeleistung, Tabelle 3: Entladeleistung – jeweils eine Zeile pro Batterie in gleicher Reihenfolge. Lade-/Entladeleistung optional.",
+          "newLine": true
+        },
+        "batteryTargetSoc": {
+          "type": "number",
+          "label": "Ziel-SoC für alle Batterien (%)",
+          "min": 0,
+          "max": 100,
+          "default": 90,
+          "sm": 6,
+          "newLine": true
+        },
+        "batteriesSoc": {
+          "type": "table",
+          "label": "Batterien (SoC)",
+          "newLine": true,
+          "items": [
+            { "attr": "socStateId", "name": "socStateId", "type": "objectId", "label": "SoC-Datenpunkt", "title": "Datenpunkt", "customFilter": { "common": { "type": "number" } } },
+            { "attr": "name", "name": "name", "type": "text", "label": "Name (Alias)", "title": "Name (Alias)" }
+          ]
+        },
+        "batteriesCharge": {
+          "type": "table",
+          "label": "Ladeleistung (optional, eine Zeile pro Batterie wie oben)",
+          "newLine": true,
+          "items": [
+            { "attr": "chargePowerStateId", "name": "chargePowerStateId", "type": "objectId", "label": "Ladeleistung (W)", "title": "Datenpunkt", "customFilter": { "common": { "type": "number" } } }
+          ]
+        },
+        "batteriesDischarge": {
+          "type": "table",
+          "label": "Entladeleistung (optional, eine Zeile pro Batterie wie oben)",
+          "newLine": true,
+          "items": [
+            { "attr": "dischargePowerStateId", "name": "dischargePowerStateId", "type": "objectId", "label": "Entladeleistung (W)", "title": "Datenpunkt", "customFilter": { "common": { "type": "number" } } }
+          ]
+        }
+      }
+    },
+    "tab_rules": {
+      "type": "panel",
+      "label": "Regeln",
+      "items": {
+        "_rulesHelp": {
+          "type": "staticText",
+          "text": "Eine Zeile = eine Regel. Ziel = Datenpunkt zum Schalten (z. B. Steckdose, WP). EIN ab = Schwellwert (W). AUS unter = Hysterese. Min. EIN/AUS = Mindestdauer. Priorität: niedrigere Zahl = zuerst. Bei Problemen: Debug-Log aktivieren.",
+          "newLine": true
+        },
+        "rules": {
+          "type": "table",
+          "label": "Regeln",
+          "newLine": true,
+          "items": [
+            { "attr": "targetStateId", "name": "targetStateId", "type": "objectId", "label": "Ziel (Schalten)", "title": "Ziel (Schalten)", "customFilter": { "common": { "role": ["switch", "button", "state"] } } },
+            { "attr": "name", "name": "name", "type": "text", "label": "Name (Alias)", "title": "Name (Alias)" },
+            { "attr": "thresholdOn", "name": "thresholdOn", "type": "number", "label": "EIN ab (W)", "title": "EIN ab (W)", "min": 0, "max": 100000 },
+            { "attr": "thresholdOff", "name": "thresholdOff", "type": "number", "label": "AUS unter (W)", "title": "AUS unter (W)", "min": 0, "max": 100000 },
+            { "attr": "minOnSec", "name": "minOnSec", "type": "number", "label": "Min. EIN (s)", "title": "Min. EIN (s)", "min": 0, "max": 3600 },
+            { "attr": "minOffSec", "name": "minOffSec", "type": "number", "label": "Min. AUS (s)", "title": "Min. AUS (s)", "min": 0, "max": 3600 },
+            { "attr": "delayOnSec", "name": "delayOnSec", "type": "number", "label": "Verz. EIN (s)", "title": "Verz. EIN (s)", "min": 0, "max": 600 },
+            { "attr": "delayOffSec", "name": "delayOffSec", "type": "number", "label": "Verz. AUS (s)", "title": "Verz. AUS (s)", "min": 0, "max": 600 },
+            { "attr": "priority", "name": "priority", "type": "number", "label": "Priorität", "title": "Priorität", "min": 0, "max": 100 },
+            { "attr": "enabled", "name": "enabled", "type": "checkbox", "label": "Aktiv", "title": "Aktiv" }
+          ]
+        }
+      }
+    }
+  }
+}

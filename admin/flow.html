@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>SCC – Energiefluss</title>
+    <link rel="stylesheet" href="admin.css">
+</head>
+<body class="scc-flow">
+    <header class="scc-dash-header">
+        <h2>PV-Überschuss – Energiefluss</h2>
+        <p class="scc-refresh">
+            <button id="scc-refresh" type="button" class="scc-btn-icon" title="Aktualisieren" aria-label="Aktualisieren">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            </button>
+            <button id="scc-open-standalone" type="button" class="scc-btn-icon" title="Als Einzelseite öffnen" aria-label="Als Einzelseite öffnen">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            </button>
+            <span id="scc-status" class="scc-status"></span>
+        </p>
+    </header>
+    <div id="scc-dashboard" class="scc-dashboard">
+        <div class="scc-dash-house" aria-label="Energiefluss Haus">
+            <section class="scc-section scc-section-house">
+                <h3>Energiefluss</h3>
+                <div class="scc-flow-diagram-wrap" id="scc-flow-diagram-wrap" aria-label="Grafische Ansicht der Energieflüsse">
+                    <div class="scc-flow-diagram" id="scc-flow-diagram"></div>
+                </div>
+            </section>
+        </div>
+        <div class="scc-dash-main">
+            <section class="scc-section scc-section-autarky" aria-label="Autarkie" id="scc-autarky-section">
+                <h3>Autarkie</h3>
+                <div class="scc-autarky-block" id="scc-autarky-block">
+                    <span class="scc-autarky-value" id="scc-autarky-value">–</span>
+                    <span class="scc-autarky-unit">%</span>
+                    <span class="scc-autarky-label">Eigenversorgung</span>
+                </div>
+            </section>
+            <section class="scc-section scc-section-flow" aria-label="Energieverteilung">
+                <h3>Energieverteilung</h3>
+                <div class="scc-diagram" id="scc-diagram"></div>
+            </section>
+            <section class="scc-section scc-section-evcc" aria-label="Leistungsverteilung">
+                <h3>Leistungsverteilung</h3>
+                <div class="scc-evcc-viz" id="scc-evcc-viz"></div>
+            </section>
+        </div>
+        <aside class="scc-dash-side">
+            <section class="scc-section scc-section-sources" aria-label="Übersicht">
+                <h3>Übersicht</h3>
+                <div id="scc-sources"></div>
+            </section>
+            <section class="scc-section scc-section-named" aria-label="Quellen mit Namen">
+                <h3>Quellen</h3>
+                <div id="scc-sources-list"></div>
+            </section>
+            <section class="scc-section scc-section-named" aria-label="Batterien mit SoC">
+                <h3>Batterien</h3>
+                <div id="scc-batteries-list"></div>
+            </section>
+            <section class="scc-section scc-section-named" aria-label="Geräte mit Namen">
+                <h3>Geräte</h3>
+                <div id="scc-rules-list"></div>
+            </section>
+            <section class="scc-section scc-section-forecast" aria-label="PV-Vorhersage" id="scc-forecast-section">
+                <h3>PV-Vorhersage</h3>
+                <div id="scc-forecast-content"></div>
+            </section>
+        </aside>
+    </div>
+    <div id="scc-details"></div>
+
+    <!-- Wie echarts/adapter-react: Admin-Socket laden, dann bei Bereitstellung nutzen -->
+    <script>
+        var sccLog = function () { try { console.log.apply(console, ['[SCC Flow]'].concat(Array.prototype.slice.call(arguments))); } catch (e) {} };
+        window.sccSocketReady = function (socket) {
+            sccLog('sccSocketReady', socket ? 'socket ok' : 'no socket');
+            window.__sccSocket = socket || window.socket || (window.io && window.io.socket);
+            if (window.__sccFlowStart) window.__sccFlowStart();
+        };
+        window.registerSocketOnLoad = function (cb) {
+            window.socketLoadedHandler = function () {
+                var s = window.socket || (window.io && window.io.socket) || window.__sccSocket;
+                sccLog('socketLoadedHandler', s ? 'socket from admin' : 'no socket');
+                if (s) window.sccSocketReady(s);
+                if (typeof cb === 'function') cb(s);
+            };
+        };
+        (function () {
+            var pathname = window.location.pathname || '';
+            var base = pathname.replace(/\/[^/]*$/, '');
+            var urls = [
+                base + '/lib/js/socket.io.js',
+                base + '/../lib/js/socket.io.js',
+                'https://cdn.jsdelivr.net/npm/socket.io-client@2.5.0/dist/socket.io.slim.js'
+            ];
+            var urlIndex = 0;
+            function runAfterLoad() {
+                if (typeof window.socketLoadedHandler === 'function') window.socketLoadedHandler();
+                if (window.__sccSocket) { sccLog('bereits Socket, skip direkte Verbindung'); return; }
+                if (typeof window.io !== 'function') {
+                    sccLog('window.io nach Laden nicht vorhanden, nächste URL');
+                    tryNext();
+                    return;
+                }
+                sccLog('socket.io.js bereit, verbinde …');
+                var host = window.location.hostname;
+                var protocol = window.location.protocol || 'http:';
+                var currentPort = window.location.port || (protocol === 'https:' ? '443' : '80');
+                var opts = { transports: ['websocket', 'polling'], path: '/socket.io', reconnection: true, timeout: 10000 };
+                function tryConnect(url, onFail) {
+                    sccLog('tryConnect', url);
+                    var s = window.io(url, opts);
+                    if (!s) { sccLog('io() lieferte nichts'); if (onFail) onFail(); return; }
+                    var done = false;
+                    s.once('connect', function () {
+                        sccLog('connect', url);
+                        if (done) return;
+                        s.emit('name', 'scc.0');
+                        s.emit('authenticate', function (isOk) {
+                            sccLog('authenticate callback', 'isOk=', isOk);
+                            if (done) return;
+                            if (isOk) { done = true; window.sccSocketReady(s); }
+                            else { sccLog('Auth fehlgeschlagen'); done = true; s.close(); if (onFail) onFail(); }
+                        });
+                    });
+                    s.once('connect_error', function (err) {
+                        sccLog('connect_error', url, err && err.message);
+                        if (!done) { done = true; s.close(); if (onFail) onFail(); }
+                    });
+                    setTimeout(function () {
+                        if (!done) { sccLog('Timeout (8s)', url); done = true; s.close(); if (onFail) onFail(); }
+                    }, 8000);
+                }
+                try {
+                    tryConnect(protocol + '//' + host + ':' + currentPort, function () {
+                        sccLog('Fallback auf Port 8084');
+                        tryConnect(protocol + '//' + host + ':8084', function () {
+                            sccLog('keine Socket-Verbindung, starte trotzdem');
+                            if (window.__sccFlowStart) window.__sccFlowStart();
+                        });
+                    });
+                } catch (e) {
+                    sccLog('tryConnect Exception', e);
+                    if (window.__sccFlowStart) window.__sccFlowStart();
+                }
+            }
+            function tryNext() {
+                if (urlIndex >= urls.length) {
+                    sccLog('alle socket.io-URLs fehlgeschlagen oder ohne window.io');
+                    if (window.__sccFlowStart) window.__sccFlowStart();
+                    return;
+                }
+                var url = urls[urlIndex++];
+                var script = document.createElement('script');
+                script.onload = function () {
+                    sccLog('Skript geladen', url);
+                    if (typeof window.io === 'function') {
+                        runAfterLoad();
+                    } else {
+                        tryNext();
+                    }
+                };
+                script.onerror = function () {
+                    sccLog('Skript Fehler', url);
+                    tryNext();
+                };
+                script.src = url;
+                sccLog('lade Socket-Skript', url);
+                document.head.appendChild(script);
+            }
+            tryNext();
+        })();
+    </script>
+    <script>
+        (function () {
+            var instanceId = 'scc.0';
+            var sendToFn = typeof sendTo === 'function' ? sendTo : (window.parent && window.parent.sendTo) || (window.opener && window.opener.sendTo);
+            var getSocketFn = (typeof getSocket === 'function' ? getSocket : null) || (window.parent && window.parent.getSocket) || (window.opener && window.opener.getSocket);
+            var getStateFn = (typeof getState === 'function' ? getState : null) || (window.parent && window.parent.getState) || (window.opener && window.opener.getState);
+            function useInjectedSocket() {
+                if (window.__sccSocket) {
+                    if (!getSocketFn) getSocketFn = function () { return window.__sccSocket; };
+                }
+            }
+            try {
+                var params = new URLSearchParams(window.location.search || (window.location.hash || '').split('?')[1] || '');
+                var inst = params.get('instance');
+                if (inst !== null && inst !== '') instanceId = 'scc.' + inst;
+            } catch (e) {}
+
+            function formatW(val) {
+                if (val == null || isNaN(val)) return '–';
+                return Math.round(Number(val)) + ' W';
+            }
+            function escapeHtml(str) {
+                if (str == null) return '';
+                var s = String(str);
+                return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+            }
+
+            function flowDataFromStates(states) {
+                if (!states) return null;
+                var prefix = instanceId + '.';
+                var powerW = states[prefix + 'surplus.powerW'];
+                var availableW = states[prefix + 'surplus.availableForDevicesW'];
+                var feedInW = states[prefix + 'surplus.feedInW'];
+                var reservedW = states[prefix + 'batteries.powerReservedW'];
+                var allCharged = states[prefix + 'batteries.allCharged'];
+                var consumptionTotalW = states[prefix + 'consumption.totalW'];
+                var gridConsW = states[prefix + 'grid.consumptionW'];
+                var gridFeedW = states[prefix + 'grid.feedInW'];
+                var genW = states[prefix + 'generation.totalW'];
+                return {
+                    surplus: {
+                        powerW: powerW && powerW.val != null ? powerW.val : 0,
+                        availableForDevicesW: availableW && availableW.val != null ? availableW.val : 0,
+                        feedInW: feedInW && feedInW.val != null ? feedInW.val : 0
+                    },
+                    batteries: {
+                        powerReservedW: reservedW && reservedW.val != null ? reservedW.val : 0,
+                        totalDischargeW: 0,
+                        allCharged: allCharged && allCharged.val === true
+                    },
+                    consumption: { totalW: consumptionTotalW && consumptionTotalW.val != null ? consumptionTotalW.val : 0 },
+                    grid: {
+                        consumptionW: gridConsW && gridConsW.val != null ? gridConsW.val : 0,
+                        feedInW: gridFeedW && gridFeedW.val != null ? gridFeedW.val : 0
+                    },
+                    generation: { totalW: genW && genW.val != null ? genW.val : 0 }
+                };
+            }
+
+            function flowDataFromFlowDataVal(val) {
+                if (val == null) return null;
+                try {
+                    var data = typeof val === 'string' ? JSON.parse(val) : val;
+                    return (data && data.surplus) ? data : null;
+                } catch (e) { return null; }
+            }
+
+            function loadFlowDataViaFlowDataState(cb) {
+                useInjectedSocket();
+                var socket = (typeof getSocketFn === 'function' && getSocketFn()) || window.__sccSocket;
+                function useVal(val) {
+                    var data = flowDataFromFlowDataVal(val);
+                    if (data) cb(data); else cb(null);
+                }
+                if (typeof getStateFn === 'function') {
+                    sccLog('loadFlowData: getStateFn(flowData)');
+                    getStateFn(instanceId + '.flowData', function (err, state) {
+                        sccLog('getStateFn Ergebnis', err ? 'err' : 'ok', state && state.val != null ? 'val' : 'kein val');
+                        useVal(state && state.val);
+                    });
+                    return;
+                }
+                if (socket) {
+                        if (typeof socket.getState === 'function') {
+                            sccLog('loadFlowData: socket.getState(flowData)');
+                            socket.getState(instanceId + '.flowData', function (err, state) {
+                                sccLog('socket.getState Ergebnis', err ? 'err' : 'ok');
+                                useVal(state && state.val);
+                            });
+                            return;
+                        }
+                        if (typeof socket.emit === 'function') {
+                            var id = instanceId + '.flowData';
+                            var replied = false;
+                            sccLog('loadFlowData: socket.emit getState/getStates', id);
+                            function handleState(a, b) {
+                                if (replied) return;
+                                var state = (b !== undefined ? b : a);
+                                if (state && state.val != null) { replied = true; sccLog('getState Antwort', state.val != null); return useVal(state.val); }
+                            }
+                            function tryGetStates() {
+                                if (replied) return;
+                                socket.emit('getStates', [id], function (a2, b2) {
+                                    if (replied) return;
+                                    var states = (b2 !== undefined ? b2 : a2);
+                                    var st = states && (states[id] || states[instanceId + '.flowData']);
+                                    sccLog('getStates Antwort', st && st.val != null ? 'val' : 'kein val');
+                                    if (st && st.val != null) { replied = true; return useVal(st.val); }
+                                    replied = true;
+                                    cb(null);
+                                });
+                            }
+                            socket.emit('getState', id, function (a, b) {
+                                handleState(a, b);
+                                if (!replied) tryGetStates();
+                            });
+                            setTimeout(function () {
+                                if (!replied) { sccLog('getState/getStates Timeout (3s)'); replied = true; cb(null); }
+                            }, 3000);
+                            return;
+                        }
+                }
+                sccLog('loadFlowData: weder getStateFn noch Socket mit getState/emit', socket ? 'Socket ohne getState/emit' : 'kein Socket');
+                cb(null);
+            }
+
+            function loadFlowDataViaStates(cb) {
+                useInjectedSocket();
+                loadFlowDataViaFlowDataState(function (data) {
+                    if (data) return cb(data);
+                    if (typeof getSocketFn !== 'function') return cb(null);
+                    var socket = getSocketFn();
+                    if (!socket) return cb(null);
+                    var ids = [
+                        instanceId + '.surplus.powerW',
+                        instanceId + '.surplus.availableForDevicesW',
+                        instanceId + '.surplus.feedInW',
+                        instanceId + '.batteries.powerReservedW',
+                        instanceId + '.batteries.allCharged',
+                        instanceId + '.consumption.totalW',
+                        instanceId + '.grid.consumptionW',
+                        instanceId + '.grid.feedInW',
+                        instanceId + '.generation.totalW'
+                    ];
+                    function onStates(err, states) {
+                        var st = (states !== undefined ? states : err);
+                        if (!st || typeof st !== 'object') return cb(null);
+                        cb(flowDataFromStates(st));
+                    }
+                    if (typeof socket.getStates === 'function') {
+                        socket.getStates(ids, onStates);
+                    } else if (typeof socket.emit === 'function') {
+                        socket.emit('getStates', ids, function (a, b) {
+                            onStates(a, b);
+                        });
+                    } else {
+                        cb(null);
+                    }
+                });
+            }
+
+            var fetchTried = false;
+            function loadFlowDataViaFetch(cb) {
+                if (fetchTried) return cb(null);
+                fetchTried = true;
+                sccLog('loadFlowDataViaFetch');
+                var id = encodeURIComponent(instanceId + '.flowData');
+                var urls = [
+                    './getState?id=' + id,
+                    '../getState?id=' + id,
+                    '/api/v1/state/' + instanceId + '.flowData',
+                    '/getState?ids=' + id
+                ];
+                var i = 0;
+                function next() {
+                    if (i >= urls.length) return cb(null);
+                    fetch(urls[i], { credentials: 'same-origin' }).then(function (r) {
+                        if (r.ok) return r.json();
+                        throw new Error();
+                    }).then(function (data) {
+                        var val = data && (data.val !== undefined ? data.val : data[instanceId + '.flowData'] && data[instanceId + '.flowData'].val);
+                        var parsed = flowDataFromFlowDataVal(val);
+                        if (parsed) cb(parsed); else { i++; next(); }
+                    }).catch(function () {
+                        i++;
+                        next();
+                    });
+                }
+                next();
+            }
+
+            function loadFlowData(cb) {
+                var done = false;
+                function finish(data) {
+                    if (done) return;
+                    done = true;
+                    sccLog('loadFlowData finish', data ? 'Daten' : 'keine Daten');
+                    cb(data);
+                }
+                fetch('/api/flowData', { credentials: 'same-origin' }).then(function (r) {
+                    if (!r.ok) throw new Error();
+                    return r.json();
+                }).then(function (data) {
+                    if (data && data.surplus) {
+                        window.__sccStandalone = true;
+                        return finish(data);
+                    }
+                    throw new Error('no surplus');
+                }).catch(function () {
+                    if (done) return;
+                    if (typeof sendToFn === 'function') {
+                    sccLog('loadFlowData: sendTo(getFlowData)');
+                    var t = setTimeout(function () {
+                        loadFlowDataViaStates(function (d) {
+                            if (d) return finish(d);
+                            loadFlowDataViaFetch(finish);
+                        });
+                    }, 2500);
+                    sendToFn(instanceId, 'getFlowData', {}, function (err, data) {
+                        clearTimeout(t);
+                        sccLog('sendTo getFlowData Antwort', err ? 'err' : 'ok', data && data.surplus ? 'surplus' : '');
+                        if (err || !data || !data.surplus) {
+                            loadFlowDataViaStates(function (d) {
+                                if (d) return finish(d);
+                                loadFlowDataViaFetch(finish);
+                            });
+                        } else {
+                            finish(data);
+                        }
+                    });
+                    } else {
+                        sccLog('loadFlowData: kein sendTo, nutze States/Fetch');
+                        loadFlowDataViaStates(function (d) {
+                            if (d) return finish(d);
+                            loadFlowDataViaFetch(finish);
+                        });
+                    }
+                });
+            }
+
+            function formatkW(val) {
+                if (val == null || isNaN(val)) return '–';
+                var w = Number(val);
+                if (Math.abs(w) >= 1000) return (w / 1000).toFixed(1) + ' kW';
+                return Math.round(w) + ' W';
+            }
+
+            function fmtW(val) {
+                if (val == null || isNaN(val)) return '–';
+                var w = Number(val);
+                return w >= 1000 ? (w / 1000).toFixed(2) + ' kW' : Math.round(w) + ' W';
+            }
+            function renderFlowDiagram(data, container) {
+                if (!container || !container.isConnected) return;
+                var needCreate = !container.__sccHouseRefs;
+                var genW = (data.generation && data.generation.totalW != null) ? Number(data.generation.totalW) : 0;
+                var gridConsW = (data.grid && data.grid.consumptionW != null) ? Number(data.grid.consumptionW) : 0;
+                var gridFeedW = (data.grid && data.grid.feedInW != null) ? Number(data.grid.feedInW) : 0;
+                var consumptionW = (data.consumption && data.consumption.totalW != null) ? Number(data.consumption.totalW) : 0;
+                var totalChargeW = (data.batteries && data.batteries.totalChargeW != null) ? Number(data.batteries.totalChargeW) : 0;
+                var totalDischargeW = (data.batteries && data.batteries.totalDischargeW != null) ? Number(data.batteries.totalDischargeW) : 0;
+                var batItems = (data.batteries && data.batteries.items) ? data.batteries.items : {};
+                var firstSoc = null;
+                try { firstSoc = Object.values(batItems)[0].soc; } catch (e) {}
+                var socStr = firstSoc != null ? Math.round(firstSoc) + '%' : '–';
+                var batStatus = totalChargeW > 0 ? 'lädt' : (totalDischargeW > 0 ? 'entlädt' : 'wartet');
+                var pathname = (typeof window !== 'undefined' && window.location && window.location.pathname) ? window.location.pathname : '';
+                var adminBase = pathname.replace(/\/[^/]*$/, '') || '.';
+                var houseImgUrl = adminBase + '/house.png';
+                var vb = '0 0 1024 1536';
+
+                // Richtung: PV = Module → WR (umgekehrt zum Kabel), Netz Einspeisung=grün→Netz, Bezug=rot←Netz
+                function dirClass(kind) {
+                    if (kind === 'pv') return 'scc-house-line--dir-fwd';
+                    if (kind === 'house') return 'scc-house-line--dir-fwd';
+                    if (kind === 'battery') return (totalDischargeW > 0 && totalChargeW <= 0) ? 'scc-house-line--dir-rev' : 'scc-house-line--dir-fwd';
+                    if (kind === 'grid') return (gridFeedW > 0) ? 'scc-house-line--dir-fwd' : 'scc-house-line--dir-rev';
+                    return 'scc-house-line--dir-fwd';
+                }
+                function flowColorClass(type) {
+                    if (type === 'pv' || type === 'battery') return 'scc-house-line--green';
+                    if (type === 'grid') return (gridFeedW > 0) ? 'scc-house-line--green' : 'scc-house-line--red';
+                    if (type === 'house') {
+                        if (gridConsW > 0 && genW > 0) return 'scc-house-line--mixed';
+                        if (gridConsW > 0) return 'scc-house-line--red';
+                        return 'scc-house-line--green';
+                    }
+                    return 'scc-house-line--green';
+                }
+                function lineCls(active, type) {
+                    var c = 'scc-house-line scc-house-line--' + type + ' ' + dirClass(type) + ' ' + flowColorClass(type);
+                    if (active) c += ' scc-house-line--active';
+                    return c;
+                }
+                function baseCls(type) { return 'scc-house-line-base scc-house-line-base--' + type; }
+                function valueColorClass(type) {
+                    if (type === 'pv') return (genW > 0) ? 'scc-house-value--green' : 'scc-house-value--muted';
+                    if (type === 'house') {
+                        if (consumptionW <= 0) return 'scc-house-value--muted';
+                        if (gridConsW > 0 && genW > 0) return 'scc-house-value--mixed';
+                        if (gridConsW > 0) return 'scc-house-value--red';
+                        return 'scc-house-value--green';
+                    }
+                    if (type === 'battery') {
+                        if (totalChargeW > 0) return 'scc-house-value--green';
+                        if (totalDischargeW > 0) return 'scc-house-value--red';
+                        return 'scc-house-value--muted';
+                    }
+                    if (type === 'grid') {
+                        if (gridFeedW > 0) return 'scc-house-value--green';
+                        if (gridConsW > 0) return 'scc-house-value--red';
+                        return 'scc-house-value--muted';
+                    }
+                    return 'scc-house-value--muted';
+                }
+                // Pfade (Start/Ende wie von dir)
+                var pathPv = 'M 499 798 L 498 758 L 452 702 L 553 678 L 652 657 L 743 635';
+                var pathPvFlow = 'M 743 635 L 652 657 L 553 678 L 452 702 L 498 758 L 499 798'; // Module → WR
+                var pathHaus = 'M 463 815 L 425 825 L 380 812 L 379 838';
+                var pathNetz = 'M 546 818 L 829 746 L 831 776 L 832 984';
+                var pathBatterie = 'M 546 845 L 657 815 L 657 869';
+                // Nur Beschriftung (Wert + Label), keine Karten-Hintergründe; Linien senkrecht
+                var connPv = 'M 521 200 L 521 574';
+                var connLast = 'M 379 140 L 379 838';
+                // Unten: Batterie (669,942), Netz (857,810) → Karten bei y=1330, Linie senkrecht nach oben
+                var connBattery = 'M 669 1330 L 669 942';
+                var connNetz = 'M 857 1330 L 857 810';
+                if (!container.__sccHouseRefs) {
+                    container.innerHTML =
+                        '<div class="scc-house-wrap">' +
+                        '  <img class="scc-house-img" src="' + houseImgUrl + '" alt=""/>' +
+                        '  <svg class="scc-house-svg" viewBox="' + vb + '" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" aria-hidden="true">' +
+                        '    <defs>' +
+                        '      <linearGradient id="scc-green-flow" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#2e9d4a"/><stop offset="35%" stop-color="#5aff78"/><stop offset="65%" stop-color="#5aff78"/><stop offset="100%" stop-color="#2e9d4a"/></linearGradient>' +
+                        '      <linearGradient id="scc-red-flow" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#b71c1c"/><stop offset="35%" stop-color="#ff6b6b"/><stop offset="65%" stop-color="#ff6b6b"/><stop offset="100%" stop-color="#b71c1c"/></linearGradient>' +
+                        '      <linearGradient id="scc-mixed-flow" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#5aff78"/><stop offset="50%" stop-color="#5aff78"/><stop offset="50%" stop-color="#ff6b6b"/><stop offset="100%" stop-color="#ff6b6b"/></linearGradient>' +
+                        '      <filter id="scc-flow-glow" x="-40%" y="-40%" width="180%" height="180%" color-interpolation-filters="sRGB">' +
+                        '        <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur"/>' +
+                        '        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>' +
+                        '      </filter>' +
+                        '    </defs>' +
+                        '    <g class="scc-house-connectors">' +
+                        '      <path d="' + connPv + '" class="scc-house-conn" />' +
+                        '      <path d="' + connLast + '" class="scc-house-conn" />' +
+                        '      <path d="' + connBattery + '" class="scc-house-conn" />' +
+                        '      <path d="' + connNetz + '" class="scc-house-conn" />' +
+                        '    </g>' +
+                        '    <g class="scc-house-lines">' +
+                        '      <path data-scc="base-pv" fill="none" />' +
+                        '      <path data-scc="base-house" fill="none" />' +
+                        '      <path data-scc="base-grid" fill="none" />' +
+                        '      <path data-scc="base-battery" fill="none" />' +
+                        '      <path data-scc="flow-pv" fill="none" pathLength="100" />' +
+                        '      <path data-scc="flow-house" fill="none" pathLength="100" />' +
+                        '      <path data-scc="flow-grid" fill="none" pathLength="100" />' +
+                        '      <path data-scc="flow-battery" fill="none" pathLength="100" />' +
+                        '    </g>' +
+                        '    <g class="scc-house-labels">' +
+                        '      <g class="scc-house-label-block scc-house-label-top" transform="translate(521, 200)"><text data-scc="val-pv" class="scc-house-value" y="0" text-anchor="middle">–</text><text class="scc-house-label" y="50" text-anchor="middle">Photovoltaik</text></g>' +
+                        '      <g class="scc-house-label-block scc-house-label-top" transform="translate(379, 140)"><text data-scc="val-house" class="scc-house-value" y="0" text-anchor="middle">–</text><text class="scc-house-label" y="50" text-anchor="middle">Last</text></g>' +
+                        '      <g class="scc-house-label-block scc-house-label-bottom" transform="translate(669, 1330)"><text data-scc="val-battery" class="scc-house-value" y="0" text-anchor="middle">–</text><text data-scc="lab-battery" class="scc-house-label" y="50" text-anchor="middle">Batterie</text></g>' +
+                        '      <g class="scc-house-label-block scc-house-label-bottom" transform="translate(857, 1330)"><text data-scc="val-grid" class="scc-house-value" y="0" text-anchor="middle">–</text><text data-scc="sub-grid" class="scc-house-sublabel" y="48" text-anchor="middle"></text><text class="scc-house-label" y="72" text-anchor="middle">Netz</text></g>' +
+                        '    </g>' +
+                        '  </svg>' +
+                        '</div>';
+                    var root = container.querySelector('.scc-house-wrap');
+                    container.__sccHouseRefs = {
+                        img: root && root.querySelector('img.scc-house-img'),
+                        basePv: container.querySelector('[data-scc="base-pv"]'),
+                        baseHouse: container.querySelector('[data-scc="base-house"]'),
+                        baseGrid: container.querySelector('[data-scc="base-grid"]'),
+                        baseBattery: container.querySelector('[data-scc="base-battery"]'),
+                        flowPv: container.querySelector('[data-scc="flow-pv"]'),
+                        flowHouse: container.querySelector('[data-scc="flow-house"]'),
+                        flowGrid: container.querySelector('[data-scc="flow-grid"]'),
+                        flowBattery: container.querySelector('[data-scc="flow-battery"]'),
+                        valPv: container.querySelector('[data-scc="val-pv"]'),
+                        valHouse: container.querySelector('[data-scc="val-house"]'),
+                        valBattery: container.querySelector('[data-scc="val-battery"]'),
+                        labBattery: container.querySelector('[data-scc="lab-battery"]'),
+                        valGrid: container.querySelector('[data-scc="val-grid"]'),
+                        subGrid: container.querySelector('[data-scc="sub-grid"]')
+                    };
+                }
+
+                var r = container.__sccHouseRefs;
+                if (r.img) r.img.src = houseImgUrl;
+                if (r.basePv) { r.basePv.setAttribute('d', pathPv); r.basePv.setAttribute('class', baseCls('pv')); }
+                if (r.baseHouse) { r.baseHouse.setAttribute('d', pathHaus); r.baseHouse.setAttribute('class', baseCls('house')); }
+                if (r.baseGrid) { r.baseGrid.setAttribute('d', pathNetz); r.baseGrid.setAttribute('class', baseCls('grid')); }
+                if (r.baseBattery) { r.baseBattery.setAttribute('d', pathBatterie); r.baseBattery.setAttribute('class', baseCls('battery')); }
+
+                if (r.flowPv) { r.flowPv.setAttribute('d', pathPvFlow); r.flowPv.setAttribute('class', lineCls(genW > 0, 'pv')); }
+                if (r.flowHouse) { r.flowHouse.setAttribute('d', pathHaus); r.flowHouse.setAttribute('class', lineCls(consumptionW > 0, 'house')); }
+                if (r.flowGrid) { r.flowGrid.setAttribute('d', pathNetz); r.flowGrid.setAttribute('class', lineCls(gridConsW > 0 || gridFeedW > 0, 'grid')); }
+                if (r.flowBattery) { r.flowBattery.setAttribute('d', pathBatterie); r.flowBattery.setAttribute('class', lineCls(totalChargeW > 0 || totalDischargeW > 0, 'battery')); }
+
+                if (r.valPv) { r.valPv.textContent = fmtW(genW); r.valPv.setAttribute('class', 'scc-house-value ' + valueColorClass('pv')); }
+                if (r.valHouse) { r.valHouse.textContent = fmtW(consumptionW); r.valHouse.setAttribute('class', 'scc-house-value ' + valueColorClass('house')); }
+                if (r.valBattery) { r.valBattery.textContent = fmtW(totalChargeW > 0 ? totalChargeW : totalDischargeW); r.valBattery.setAttribute('class', 'scc-house-value ' + valueColorClass('battery')); }
+                if (r.labBattery) { r.labBattery.textContent = 'Batterie ' + socStr + ' ' + batStatus; r.labBattery.setAttribute('class', 'scc-house-label ' + valueColorClass('battery')); }
+                if (r.valGrid) { r.valGrid.textContent = (gridConsW > 0 ? fmtW(gridConsW) : gridFeedW > 0 ? fmtW(gridFeedW) : '–'); r.valGrid.setAttribute('class', 'scc-house-value ' + valueColorClass('grid')); }
+                if (r.subGrid) { r.subGrid.textContent = (gridConsW > 0 ? 'Bezug' : gridFeedW > 0 ? 'Einspeisung' : ''); r.subGrid.setAttribute('class', 'scc-house-sublabel ' + valueColorClass('grid')); }
+            }
+
+            function render(data) {
+                var diagram = document.getElementById('scc-diagram');
+                var sourcesEl = document.getElementById('scc-sources');
+                var details = document.getElementById('scc-details');
+                var status = document.getElementById('scc-status');
+
+                if (!diagram) return;
+
+                if (!data || !data.surplus) {
+                    sccLog('render: keine Daten → Keine Verbindung');
+                    var flowDiagramEl = document.getElementById('scc-flow-diagram');
+                    var emptyData = { surplus: {}, generation: {}, grid: {}, batteries: {}, consumption: {} };
+                    if (flowDiagramEl) renderFlowDiagram(emptyData, flowDiagramEl);
+                    var objLink = window.location.pathname.replace(/\/adapter\/[^/]+\/.*$/, '/#tab-objects');
+                    diagram.innerHTML =
+                        '<p class="scc-msg scc-msg-error"><strong>Keine Verbindung</strong> – der Tab kann in dieser Admin-Umgebung nicht auf die Adapter-Daten zugreifen.</p>' +
+                        '<p class="scc-hint">Die Werte liegen unter <strong>Objekte → ' + instanceId + '</strong>. ' +
+                        'In <strong>VIS</strong> oder <strong>Material</strong> die Datenpunkte einbinden.</p>' +
+                        '<p><a href="' + objLink + '" target="_blank" rel="noopener" class="scc-link">Objekte im Admin öffnen</a></p>';
+                    if (sourcesEl) sourcesEl.innerHTML = '';
+                    var evccViz = document.getElementById('scc-evcc-viz');
+                    if (evccViz) evccViz.innerHTML = '';
+                    if (status) status.textContent = 'Keine Verbindung';
+                    if (details) details.innerHTML = '';
+                    var autarkyVal = document.getElementById('scc-autarky-value');
+                    if (autarkyVal) autarkyVal.textContent = '–';
+                    var forecastContent = document.getElementById('scc-forecast-content');
+                    if (forecastContent) forecastContent.innerHTML = '';
+                    return;
+                }
+
+                sccLog('render: Daten', data.surplus.powerW, 'W Überschuss');
+                var autarkyPct = data.autarky && data.autarky.percent != null ? data.autarky.percent : null;
+                var autarkyValEl = document.getElementById('scc-autarky-value');
+                if (autarkyValEl) autarkyValEl.textContent = autarkyPct != null ? Math.round(autarkyPct) : '–';
+
+                var forecastContent = document.getElementById('scc-forecast-content');
+                if (forecastContent) {
+                    if (data.forecast && data.forecast.enabled) {
+                        var fw = data.forecast.powerW != null ? Number(data.forecast.powerW) : null;
+                        forecastContent.innerHTML = '<p class="scc-forecast-line"><span class="scc-forecast-label">Vorhersage (Leistung)</span> <span class="scc-forecast-value">' + (fw != null ? formatW(fw) : '–') + '</span></p>';
+                    } else {
+                        forecastContent.innerHTML = '<p class="scc-muted-small">Nicht aktiv. In der Adapter-Konfiguration „PV-Vorhersage aktiv“ und einen Vorhersage-Datenpunkt eintragen.</p>';
+                    }
+                }
+
+                var surplusW = data.surplus.powerW;
+                var availableW = data.surplus.availableForDevicesW;
+                var reservedW = data.batteries && data.batteries.powerReservedW != null ? data.batteries.powerReservedW : 0;
+                var totalChargeW = data.batteries && data.batteries.totalChargeW != null ? data.batteries.totalChargeW : 0;
+                var batteryDisplayW = (totalChargeW > 0) ? totalChargeW : reservedW;
+                var batteryLabel = (totalChargeW > 0) ? 'Batterie (tatsächlich)' : 'Batterie (reserviert)';
+                var allCharged = data.batteries && data.batteries.allCharged === true;
+                var consumptionW = data.consumption && data.consumption.totalW != null ? data.consumption.totalW : 0;
+
+                renderFlowDiagram(data, document.getElementById('scc-flow-diagram'));
+                diagram.innerHTML =
+                    '<div class="scc-flow-row">' +
+                    '  <div class="scc-node scc-node-source" title="Brutto-Überschuss aus PV/Quellen">' +
+                    '    <div class="scc-node-icon" aria-hidden="true">☀️</div>' +
+                    '    <div class="scc-node-label">Brutto-Überschuss</div>' +
+                    '    <div class="scc-node-value">' + formatW(surplusW) + '</div>' +
+                    '  </div>' +
+                    '  <div class="scc-flow-arrow" aria-hidden="true"><span class="scc-flow-arrow-line"></span><span class="scc-flow-arrow-label">' + formatW(batteryDisplayW) + '</span></div>' +
+                    '  <div class="scc-node scc-node-battery ' + (batteryDisplayW > 0 ? 'active' : '') + '" title="' + batteryLabel + '">' +
+                    '    <div class="scc-node-icon" aria-hidden="true">🔋</div>' +
+                    '    <div class="scc-node-label">Batterie</div>' +
+                    '    <div class="scc-node-value">' + formatW(batteryDisplayW) + '</div>' +
+                    '    <div class="scc-node-sublabel">' + (function() { var items = data.batteries && data.batteries.items; var totalCh = data.batteries && data.batteries.totalChargeW != null ? data.batteries.totalChargeW : 0; var totalDch = data.batteries && data.batteries.totalDischargeW != null ? data.batteries.totalDischargeW : 0; if (!items || Object.keys(items).length === 0) return '–'; var first = Object.values(items)[0]; var soc = first.soc; var txt = soc != null ? Math.round(soc) + '%' : '–'; if (totalDch > 0) return txt + ' – entlädt'; if (allCharged) return txt + ' – voll'; if (totalCh > 0) return txt + ' – lädt'; return txt + ' – wartet'; })() + '</div>' +
+                    '  </div>' +
+                    '  <div class="scc-flow-arrow" aria-hidden="true"><span class="scc-flow-arrow-line"></span><span class="scc-flow-arrow-label">' + formatW(availableW) + '</span></div>' +
+                    '  <div class="scc-node scc-node-consumer" title="Für Geräte/Steckdosen verfügbar">' +
+                    '    <div class="scc-node-icon" aria-hidden="true">🏠</div>' +
+                    '    <div class="scc-node-label">Für Verbraucher</div>' +
+                    '    <div class="scc-node-value">' + formatW(availableW) + '</div>' +
+                    '  </div>' +
+                    '</div>' +
+                    '<div class="scc-flow-consumption" aria-label="Aktueller Hausverbrauch">' +
+                    '  <span class="scc-flow-consumption-label">Hausverbrauch (aktuell)</span>' +
+                    '  <span class="scc-flow-consumption-value">' + formatW(consumptionW) + '</span>' +
+                    '</div>';
+
+                if (sourcesEl) {
+                    sourcesEl.innerHTML =
+                        '<table class="scc-sources-table">' +
+                        '<tr><td class="scc-sources-name"><span class="scc-sources-dot scc-dot-source"></span> Brutto-Überschuss</td><td class="scc-sources-value">' + formatkW(surplusW) + '</td></tr>' +
+                        '<tr><td class="scc-sources-name"><span class="scc-sources-dot scc-dot-battery"></span> ' + batteryLabel + '</td><td class="scc-sources-value">' + formatkW(batteryDisplayW) + '</td></tr>' +
+                        '<tr><td class="scc-sources-name"><span class="scc-sources-dot scc-dot-consumer"></span> Für Verbraucher</td><td class="scc-sources-value">' + formatkW(availableW) + '</td></tr>' +
+                        '<tr><td class="scc-sources-name"><span class="scc-sources-dot scc-dot-consumption"></span> Hausverbrauch (aktuell)</td><td class="scc-sources-value">' + formatkW(consumptionW) + '</td></tr>' +
+                        '</table>';
+                }
+
+                var sourcesListEl = document.getElementById('scc-sources-list');
+                var rulesListEl = document.getElementById('scc-rules-list');
+                if (sourcesListEl) {
+                    var list = (data.sourcesList && data.sourcesList.length) ? data.sourcesList : [];
+                    sourcesListEl.innerHTML = list.length === 0
+                        ? '<p class="scc-muted-small">Keine Quellen mit Namen.</p>'
+                        : '<ul class="scc-named-list">' + list.map(function (item) {
+                            var label = (item.name && item.name.trim()) ? item.name.trim() : (item.stateId ? item.stateId.split('.').slice(-2).join('.') : '–');
+                            return '<li><span class="scc-named-label" title="' + (item.stateId || '') + '">' + escapeHtml(label) + '</span><span class="scc-named-value">' + formatkW(item.lastValueW) + '</span></li>';
+                        }).join('') + '</ul>';
+                }
+                var batteriesListEl = document.getElementById('scc-batteries-list');
+                if (batteriesListEl) {
+                    var items = (data.batteries && data.batteries.items) ? data.batteries.items : {};
+                    var blist = Object.entries(items).map(function (e) { var o = e[1]; o._id = e[0]; return o; });
+                    batteriesListEl.innerHTML = blist.length === 0
+                        ? '<p class="scc-muted-small">Keine Batterien konfiguriert.</p>'
+                        : '<ul class="scc-named-list">' + blist.map(function (item) {
+                            var label = (item.name && item.name.trim()) ? item.name.trim() : (item._id || 'Batterie');
+                            var soc = item.soc != null ? Math.round(item.soc) + '%' : '–';
+                            var chargeW = item.chargePowerW != null ? Number(item.chargePowerW) : 0;
+                            var dischargeW = item.dischargePowerW != null ? Number(item.dischargePowerW) : 0;
+                            var status = dischargeW > 0 ? 'entlädt' : (!item.needsCharge ? 'voll' : (chargeW > 0 ? 'lädt' : 'wartet'));
+                            var statusClass = dischargeW > 0 ? 'scc-status-discharging' : (!item.needsCharge ? 'scc-status-full' : (chargeW > 0 ? 'scc-status-loading' : 'scc-status-waiting'));
+                            return '<li><span class="scc-named-label" title="' + escapeHtml(item._id || '') + '">' + escapeHtml(label) + '</span><span class="scc-named-value" title="SoC (Ziel ' + (item.targetSoc || 90) + '%)">' + soc + ' <span class="scc-battery-status ' + statusClass + '">' + status + '</span></span></li>';
+                        }).join('') + '</ul>';
+                }
+                if (rulesListEl) {
+                    var rlist = (data.rulesList && data.rulesList.length) ? data.rulesList : [];
+                    rulesListEl.innerHTML = rlist.length === 0
+                        ? '<p class="scc-muted-small">Keine Geräte mit Namen.</p>'
+                        : '<ul class="scc-named-list">' + rlist.map(function (item) {
+                            var label = (item.name && item.name.trim()) ? item.name.trim() : (item.ruleId || '–');
+                            return '<li><span class="scc-named-label" title="' + (item.ruleId || '') + '">' + escapeHtml(label) + '</span><span class="scc-named-value scc-named-state ' + (item.state ? 'on' : 'off') + '">' + (item.state ? 'Ein' : 'Aus') + '</span></li>';
+                        }).join('') + '</ul>';
+                }
+
+                updatePowerViz(data);
+                if (status) status.textContent = instanceId + ' – aktualisiert';
+                if (details) details.innerHTML = '';
+            }
+
+            function getPowerVizHtml(data) {
+                var pvSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="24" height="24"><path fill="none" d="M0 0h48v48H0z"/><path fill="currentColor" d="M24 34c5.514 0 10-4.486 10-10s-4.486-10-10-10-10 4.486-10 10 4.486 10 10 10zm6-10c0 3.309-2.691 6-6 6s-6-2.691-6-6 2.691-6 6-6 6 2.691 6 6zM22 4h4v6h-4zM22 38h4v6h-4zM4 22h6v4H4zM38 22h6v4h-6zM12.268 7.68l3.464-2 3 5.196-3.464 2zM29.267 37.122l3.465-2 3 5.196-3.465 2zM5.68 32.267l5.195-3 2 3.465-5.195 3zM35.125 15.269l5.196-3 2 3.466-5.196 3zM5.68 15.732l2-3.465 5.196 3-2 3.465zM35.123 32.734l2.001-3.465 5.196 3-2 3.465zM12.267 40.32l3-5.197 3.464 2-3 5.196zM29.269 10.875l3-5.195 3.465 2-3 5.196z"/></svg>';
+                var gridSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M12 2L2 7v10h2v-4h16v4h2V7L12 2zm0 2.2l6 3.33v.95H6v-.95L12 4.2zM4 15h4v4H4v-4zm6 0h4v4h-4v-4zm6 0h4v4h-4v-4z"/></svg>';
+                var batSvg = '<svg viewBox="0 0 48 48" width="24" height="24"><path fill="none" d="M0-.004h48v48H0v-48z"/><path fill="currentColor" d="M35 9.996h-3v-4a2 2 0 00-2-2H18a2 2 0 00-2 2v4h-3a2 2 0 00-2 2v30a2 2 0 002 2h22a2 2 0 002-2v-30a2 2 0 00-2-2zm-15-2h8v2h-8v-2zm13 32H15v-26h18v26z"/></svg>';
+                var homeSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="24" height="24"><path fill="none" d="M0 0h48v48H0z"/><path fill="currentColor" d="M8 44h32V20h4L24 4 4 20h4v24zm18-4h-4V28h4v12zM12 18.723l12-9.6 12 9.6V40h-6V24H18v16h-6V18.723z"/></svg>';
+                var list = (data && data.sourcesList && data.sourcesList.length) ? data.sourcesList : [];
+                var details = list.filter(function (s) { return s.type === 'consumptionDetail'; });
+                var consumptionTotalW = (data.consumption && data.consumption.totalW != null) ? Number(data.consumption.totalW) : 0;
+                var consumptionSources = details.length > 0 ? details : list.filter(function (s) { return s.type === 'consumption'; });
+                var outBarsHtml = '';
+                if (consumptionSources.length > 0) {
+                    consumptionSources.forEach(function (s, i) {
+                        var lbl = (s.name && s.name.trim()) ? s.name.trim() : (s.stateId ? s.stateId.split('.').slice(-2).join('.') : 'Verbraucher');
+                        var cl = 'scc-evcc-cons-' + (i < 5 ? i : 4);
+                        outBarsHtml += '<div class="scc-evcc-bar ' + cl + '" data-key="cons-' + i + '" data-cons-name="' + escapeHtml(lbl) + '" title="' + escapeHtml(lbl) + '"><div class="scc-evcc-bar-icon">' + homeSvg + '</div></div>';
+                    });
+                    var sumDetails = consumptionSources.reduce(function (sum, s) { return sum + (s.lastValueW != null ? Number(s.lastValueW) : 0); }, 0);
+                    if (consumptionTotalW > sumDetails && consumptionTotalW > 0) {
+                        outBarsHtml += '<div class="scc-evcc-bar scc-evcc-cons-sonstige" data-key="cons-sonstige" title="Sonstige Verbraucher"><div class="scc-evcc-bar-icon">' + homeSvg + '</div></div>';
+                    }
+                } else {
+                    outBarsHtml += '<div class="scc-evcc-bar" data-key="consumption" title="Verbraucher / Haus"><div class="scc-evcc-bar-icon">' + homeSvg + '</div></div>';
+                }
+                outBarsHtml += '<div class="scc-evcc-bar" data-key="batteryOut" title="Batterie laden"><div class="scc-evcc-bar-icon">' + batSvg + '</div></div>';
+                outBarsHtml += '<div class="scc-evcc-bar" data-key="feedIn" title="Einspeisung"><div class="scc-evcc-bar-icon">' + gridSvg + '</div></div>';
+                return '<div class="scc-evcc-scale"><div class="scc-evcc-bars">' +
+                    '<div class="scc-evcc-bar" data-key="pv" title="PV / Erzeugung"><div class="scc-evcc-bar-icon">' + pvSvg + '</div></div>' +
+                    '<div class="scc-evcc-bar" data-key="grid" title="Netzbezug"><div class="scc-evcc-bar-icon">' + gridSvg + '</div></div>' +
+                    '<div class="scc-evcc-bar" data-key="batteryIn" title="Batterie Entladung"><div class="scc-evcc-bar-icon">' + batSvg + '</div></div>' +
+                    '</div><div class="scc-evcc-total" id="scc-evcc-inTotal">0 W</div><div class="scc-evcc-name">In</div></div>' +
+                    '<div class="scc-evcc-scale"><div class="scc-evcc-bars">' + outBarsHtml +
+                    '</div><div class="scc-evcc-total" id="scc-evcc-outTotal">0 W</div><div class="scc-evcc-name">Out</div></div>';
+            }
+
+            function updatePowerViz(data) {
+                var container = document.getElementById('scc-evcc-viz');
+                if (!container) return;
+                var genW = (data.generation && data.generation.totalW != null) ? Number(data.generation.totalW) : 0;
+                var gridConsW = (data.grid && data.grid.consumptionW != null) ? Number(data.grid.consumptionW) : 0;
+                var dischargeW = (data.batteries && data.batteries.totalDischargeW != null) ? Number(data.batteries.totalDischargeW) : 0;
+                var consumptionW = (data.consumption && data.consumption.totalW != null) ? Number(data.consumption.totalW) : 0;
+                var reservedW = (data.batteries && data.batteries.powerReservedW != null) ? Number(data.batteries.powerReservedW) : 0;
+                var totalChargeW = (data.batteries && data.batteries.totalChargeW != null) ? Number(data.batteries.totalChargeW) : 0;
+                var batteryOutW = (totalChargeW > 0) ? totalChargeW : reservedW;
+                var feedInW = (data.grid && data.grid.feedInW != null) ? Number(data.grid.feedInW) : (data.surplus && data.surplus.feedInW != null ? Number(data.surplus.feedInW) : 0);
+
+                var list = (data.sourcesList && data.sourcesList.length) ? data.sourcesList : [];
+                var details = list.filter(function (s) { return s.type === 'consumptionDetail'; });
+                var consumptionSources = details.length > 0 ? details : list.filter(function (s) { return s.type === 'consumption'; });
+                var totalIn = genW + gridConsW + dischargeW;
+                var totalOut = consumptionW + batteryOutW + feedInW;
+                if (totalIn < 1) totalIn = 1;
+                if (totalOut < 1) totalOut = 1;
+
+                container.innerHTML = getPowerVizHtml(data);
+                var inBars = container.querySelector('.scc-evcc-scale:first-child .scc-evcc-bars');
+                var outBars = container.querySelectorAll('.scc-evcc-scale')[1] && container.querySelectorAll('.scc-evcc-scale')[1].querySelector('.scc-evcc-bars');
+                if (inBars) {
+                    var pvEl = inBars.querySelector('[data-key="pv"]');
+                    var gridEl = inBars.querySelector('[data-key="grid"]');
+                    var batInEl = inBars.querySelector('[data-key="batteryIn"]');
+                    if (pvEl) { pvEl.style.flexBasis = (100 * genW / totalIn).toFixed(2) + '%'; pvEl.classList.toggle('scc-evcc-bar--hidden', genW <= 0); }
+                    if (gridEl) { gridEl.style.flexBasis = (100 * gridConsW / totalIn).toFixed(2) + '%'; gridEl.classList.toggle('scc-evcc-bar--hidden', gridConsW <= 0); }
+                    if (batInEl) { batInEl.style.flexBasis = (100 * dischargeW / totalIn).toFixed(2) + '%'; batInEl.classList.toggle('scc-evcc-bar--hidden', dischargeW <= 0); }
+                }
+                if (outBars) {
+                    if (consumptionSources.length > 0) {
+                        consumptionSources.forEach(function (s, i) {
+                            var w = (s.lastValueW != null) ? Number(s.lastValueW) : 0;
+                            var el = outBars.querySelector('[data-key="cons-' + i + '"]');
+                            if (el) { el.style.flexBasis = (100 * w / totalOut).toFixed(2) + '%'; el.classList.toggle('scc-evcc-bar--hidden', w <= 0); }
+                        });
+                        var sonstigeEl = outBars.querySelector('[data-key="cons-sonstige"]');
+                        if (sonstigeEl) {
+                            var sumDetails = consumptionSources.reduce(function (sum, s) { return sum + (s.lastValueW != null ? Number(s.lastValueW) : 0); }, 0);
+                            var sonstigeW = Math.max(0, consumptionW - sumDetails);
+                            sonstigeEl.style.flexBasis = (100 * sonstigeW / totalOut).toFixed(2) + '%';
+                            sonstigeEl.classList.toggle('scc-evcc-bar--hidden', sonstigeW <= 0);
+                        }
+                    } else {
+                        var consEl = outBars.querySelector('[data-key="consumption"]');
+                        if (consEl) { consEl.style.flexBasis = (100 * consumptionW / totalOut).toFixed(2) + '%'; consEl.classList.toggle('scc-evcc-bar--hidden', consumptionW <= 0); }
+                    }
+                    var batOutEl = outBars.querySelector('[data-key="batteryOut"]');
+                    var feedEl = outBars.querySelector('[data-key="feedIn"]');
+                    if (batOutEl) { batOutEl.style.flexBasis = (100 * batteryOutW / totalOut).toFixed(2) + '%'; batOutEl.classList.toggle('scc-evcc-bar--hidden', batteryOutW <= 0); }
+                    if (feedEl) { feedEl.style.flexBasis = (100 * feedInW / totalOut).toFixed(2) + '%'; feedEl.classList.toggle('scc-evcc-bar--hidden', feedInW <= 0); }
+                }
+                var inTotalEl = document.getElementById('scc-evcc-inTotal');
+                var outTotalEl = document.getElementById('scc-evcc-outTotal');
+                var totalInDisp = genW + gridConsW + dischargeW;
+                var totalOutDisp = consumptionW + batteryOutW + feedInW;
+                if (inTotalEl) inTotalEl.textContent = (totalInDisp >= 1000 ? (totalInDisp / 1000).toFixed(1) + ' kW' : Math.round(totalInDisp) + ' W');
+                if (outTotalEl) outTotalEl.textContent = (totalOutDisp >= 1000 ? (totalOutDisp / 1000).toFixed(1) + ' kW' : Math.round(totalOutDisp) + ' W');
+            }
+
+            function run() {
+                loadFlowData(render);
+            }
+
+            var btn = document.getElementById('scc-refresh');
+            if (btn) btn.addEventListener('click', run);
+            var openStandaloneBtn = document.getElementById('scc-open-standalone');
+            if (openStandaloneBtn) openStandaloneBtn.addEventListener('click', function () {
+                window.open(window.location.href, '_blank');
+            });
+
+            window.__sccFlowStart = function () {
+                sccLog('__sccFlowStart', window.__sccSocket ? 'Socket da' : 'kein Socket');
+                useInjectedSocket();
+                run();
+                if (!window.__sccInterval) window.__sccInterval = setInterval(run, 2000);
+            };
+
+            window.addEventListener('message', function (e) {
+                if (!e || !e.data || e.data.type !== 'scc-flow-states') return;
+                var d = e.data;
+                if (d.instanceId !== instanceId) return;
+                if (d.states && d.states[instanceId + '.flowData']) {
+                    var parsed = flowDataFromFlowDataVal(d.states[instanceId + '.flowData'].val);
+                    if (parsed) render(parsed);
+                    return;
+                }
+                if (d.states) {
+                    var fromStates = flowDataFromStates(d.states);
+                    if (fromStates) render(fromStates);
+                }
+            });
+
+            try {
+                window.parent.postMessage({
+                    type: 'scc-flow-request',
+                    instanceId: instanceId,
+                    ids: [instanceId + '.flowData', instanceId + '.surplus.powerW', instanceId + '.surplus.availableForDevicesW', instanceId + '.surplus.feedInW', instanceId + '.batteries.powerReservedW', instanceId + '.batteries.allCharged', instanceId + '.consumption.totalW', instanceId + '.grid.consumptionW', instanceId + '.grid.feedInW', instanceId + '.generation.totalW']
+                }, '*');
+            } catch (err) {}
+
+            // Diagramm sofort mit Platzhaltern anlegen, damit es beim Refresh immer da ist
+            var flowContainer = document.getElementById('scc-flow-diagram');
+            if (flowContainer) {
+                var emptyData = { surplus: {}, generation: {}, grid: {}, batteries: {}, consumption: {} };
+                renderFlowDiagram(emptyData, flowContainer);
+            }
+
+            function scheduleRun() {
+                requestAnimationFrame(function () {
+                    requestAnimationFrame(function () { run(); });
+                });
+            }
+            scheduleRun();
+            if (!window.__sccInterval) window.__sccInterval = setInterval(run, 2000);
+            setTimeout(run, 100);
+            setTimeout(run, 500);
+            setTimeout(run, 1200);
+        })();
+    </script>
+</body>
+</html>

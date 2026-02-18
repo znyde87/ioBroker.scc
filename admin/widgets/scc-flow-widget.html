@@ -1,0 +1,81 @@
+<!-- SCC Energiefluss – für VIS/Material HTML-Widget -->
+<!-- OID: scc.0.flowData (in VIS HTML-Widget OID setzen oder unten anpassen) -->
+<div class="scc-flow-widget" id="scc-flow-widget">
+  <div class="scc-flow-row">
+    <div class="scc-flow-node scc-flow-source">
+      <span class="scc-flow-icon">☀️</span>
+      <span class="scc-flow-label">Brutto</span>
+      <span class="scc-flow-value" id="scc-surplus">–</span>
+    </div>
+    <div class="scc-flow-arrow">→</div>
+    <div class="scc-flow-node scc-flow-battery">
+      <span class="scc-flow-icon">🔋</span>
+      <span class="scc-flow-label">Batterie</span>
+      <span class="scc-flow-value" id="scc-reserved">–</span>
+    </div>
+    <div class="scc-flow-arrow">→</div>
+    <div class="scc-flow-node scc-flow-consumer">
+      <span class="scc-flow-icon">🏠</span>
+      <span class="scc-flow-label">Verbraucher</span>
+      <span class="scc-flow-value" id="scc-available">–</span>
+    </div>
+  </div>
+  <div class="scc-flow-footer">
+    <span>Hausverbrauch:</span>
+    <span id="scc-consumption">–</span>
+    <span>Autarkie:</span>
+    <span id="scc-autarky">–</span>%
+  </div>
+</div>
+<style>
+.scc-flow-widget { font-family: sans-serif; font-size: 12px; padding: 8px; background: #f5f5f5; border-radius: 6px; }
+.scc-flow-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.scc-flow-node { display: flex; flex-direction: column; align-items: center; padding: 6px 10px; background: #fff; border-radius: 4px; min-width: 70px; }
+.scc-flow-icon { font-size: 18px; }
+.scc-flow-label { font-size: 10px; color: #666; }
+.scc-flow-value { font-weight: bold; }
+.scc-flow-arrow { color: #999; }
+.scc-flow-footer { margin-top: 6px; font-size: 11px; color: #666; }
+</style>
+<script>
+(function() {
+  var oid = 'scc.0.flowData';
+  try { if (typeof oidFlowData !== 'undefined') oid = oidFlowData; } catch(e) {}
+  try { if (typeof $$oid !== 'undefined' && $$oid) oid = $$oid; } catch(e) {}
+  function fmt(v) { if (v == null || isNaN(v)) return '–'; var w = Number(v); if (Math.abs(w) >= 1000) return (w/1000).toFixed(1)+' kW'; return Math.round(w)+' W'; }
+  function update(data) {
+    if (!data || !data.surplus) return;
+    var e = function(s) { return document.getElementById('scc-'+s); };
+    if (e('surplus')) e('surplus').textContent = fmt(data.surplus.powerW);
+    if (e('reserved')) {
+                    var tc = data.batteries && data.batteries.totalChargeW;
+                    e('reserved').textContent = fmt((tc != null && tc > 0) ? tc : (data.batteries && data.batteries.powerReservedW));
+                }
+    if (e('available')) e('available').textContent = fmt(data.surplus.availableForDevicesW);
+    if (e('consumption')) e('consumption').textContent = fmt(data.consumption && data.consumption.totalW);
+    if (e('autarky')) e('autarky').textContent = (data.autarky && data.autarky.percent != null) ? Math.round(data.autarky.percent) : '–';
+  }
+  function load() {
+    try {
+      if (typeof getState === 'function') {
+        getState(oid, function(err, state) {
+          if (!err && state && state.val) {
+            var d = typeof state.val === 'string' ? JSON.parse(state.val) : state.val;
+            update(d);
+          }
+        });
+      } else if (typeof socket !== 'undefined' && socket && socket.emit) {
+        socket.emit('getState', oid, function(err, state) {
+          if (!err && state && state.val) {
+            var d = typeof state.val === 'string' ? JSON.parse(state.val) : state.val;
+            update(d);
+          }
+        });
+      }
+    } catch(e) {}
+  }
+  load();
+  setInterval(load, 2000);
+  try { if (typeof subscribe === 'function') subscribe(oid); } catch(e) {}
+})();
+</script>

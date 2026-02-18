@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SCC – PV-Überschuss-Steuerung</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            margin: 0;
+            padding: 24px;
+            background: var(--scc-bg, #1e1e1e);
+            color: var(--scc-text, #e0e0e0);
+            line-height: 1.5;
+            max-width: 720px;
+        }
+        .scc-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 28px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--scc-border, #404040);
+        }
+        .scc-header-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .scc-header-icon svg { width: 28px; height: 28px; fill: #fff; }
+        .scc-header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--scc-heading, #fff);
+        }
+        .scc-header p {
+            margin: 4px 0 0 0;
+            font-size: 0.9rem;
+            color: var(--scc-muted, #9e9e9e);
+        }
+        .scc-card {
+            background: var(--scc-card-bg, #2d2d2d);
+            border: 1px solid var(--scc-border, #404040);
+            border-radius: 12px;
+            padding: 20px 24px;
+            margin-bottom: 20px;
+        }
+        .scc-card h2 {
+            margin: 0 0 12px 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--scc-heading, #fff);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .scc-card h2 .fa { color: #2196f3; }
+        .scc-card p {
+            margin: 0;
+            font-size: 0.95rem;
+            color: var(--scc-muted, #b0b0b0);
+        }
+        .scc-card ul {
+            margin: 12px 0 0 0;
+            padding-left: 20px;
+            color: var(--scc-muted, #b0b0b0);
+            font-size: 0.95rem;
+        }
+        .scc-card li { margin-bottom: 6px; }
+        .scc-cta {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 16px;
+            padding: 10px 18px;
+            background: #2196f3;
+            color: #fff;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.95rem;
+            border: none;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .scc-cta:hover { background: #1976d2; }
+        .scc-cta.secondary {
+            background: var(--scc-card-bg, #3d3d3d);
+            color: var(--scc-text, #e0e0e0);
+            border: 1px solid var(--scc-border, #505050);
+        }
+        .scc-cta.secondary:hover { background: var(--scc-border, #505050); }
+        .scc-note {
+            font-size: 0.85rem;
+            color: var(--scc-muted, #9e9e9e);
+            margin-top: 24px;
+            padding: 12px 16px;
+            background: var(--scc-bg, #252525);
+            border-radius: 8px;
+            border-left: 4px solid #2196f3;
+        }
+    </style>
+</head>
+<body>
+    <header class="scc-header">
+        <div class="scc-header-icon">
+            <svg viewBox="0 0 24 24"><path d="M11 21h-1l1-7H7.5c-.58 0-.57-.32-.38-.66.19-.34.05-.08.07-.12C8.48 10.94 10.42 7.54 13 3h1l-1 7h3.5c.49 0 .56.33.47.51l-.07.15C12 19 11 21 11 21z"/></svg>
+        </div>
+        <div>
+            <h1>PV-Überschuss-Steuerung (SCC)</h1>
+            <p>Erst Batterien laden, dann Geräte schalten, Rest ins Netz</p>
+        </div>
+    </header>
+
+    <section class="scc-card">
+        <h2><span class="fa fa-cog"></span> Konfiguration</h2>
+        <p>Klicken Sie auf das <strong>Stift-Symbol</strong> oben rechts, um die Instanz zu konfigurieren. Es öffnet sich ein Formular mit vier Tabs:</p>
+        <ul>
+            <li><strong>Allgemein:</strong> Schwellwert (W), Batterie-Reservierung, Intervall – direkt eingeben</li>
+            <li><strong>Quellen:</strong> Datenpunkte per <strong>Klick aus dem Objektbaum</strong> wählen (objectId-Picker), Typ und Einheit auswählen</li>
+            <li><strong>Batterien:</strong> SoC- und Ladeleistungs-Datenpunkte per Klick wählen, Ziel-SoC in %</li>
+            <li><strong>Regeln:</strong> Schalt-Ziele (Steckdosen/Geräte) per Klick wählen, Schwellwerte in Watt</li>
+        </ul>
+        <p style="margin-top:12px">Nach dem Ändern <strong>Speichern</strong> nicht vergessen; die Instanz ggf. neu starten.</p>
+    </section>
+
+    <section class="scc-card">
+        <h2><span class="fa fa-bolt"></span> Energiefluss anzeigen</h2>
+        <p>Der Tab <strong>Flow</strong> zeigt den aktuellen Energiefluss: Brutto-Überschuss → Batterie (reserviert) → für Verbraucher verfügbar.</p>
+        <a href="flow.html" class="scc-cta">Zum Flow-Diagramm</a>
+    </section>
+
+    <div class="scc-note">
+        Alle berechneten Werte stehen als States unter <code>scc.0.surplus.*</code>, <code>scc.0.batteries.*</code> und <code>scc.0.rules.*</code> für VIS und andere Adapter zur Verfügung.
+    </div>
+</body>
+</html>
