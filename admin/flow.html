@@ -8,6 +8,7 @@
 <body class="scc-flow">
     <header class="scc-dash-header">
         <h2>PV-Überschuss – Energiefluss</h2>
+        <p id="scc-simulation-banner" class="scc-simulation-banner" role="status" aria-live="polite" style="display:none;">Simulation aktiv – es wird nicht geschaltet</p>
         <p class="scc-refresh">
             <button id="scc-refresh" type="button" class="scc-btn-icon" title="Aktualisieren" aria-label="Aktualisieren">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
@@ -58,16 +59,18 @@
                 <h3>Batterien</h3>
                 <div id="scc-batteries-list"></div>
             </section>
-            <section class="scc-section scc-section-named" aria-label="Geräte mit Namen">
-                <h3>Geräte</h3>
-                <div id="scc-rules-list"></div>
-            </section>
             <section class="scc-section scc-section-forecast" aria-label="PV-Vorhersage" id="scc-forecast-section">
                 <h3>PV-Vorhersage</h3>
                 <div id="scc-forecast-content"></div>
             </section>
         </aside>
     </div>
+    <footer class="scc-dash-footer" aria-label="Überschuss-Geräte">
+        <section class="scc-section scc-section-devices">
+            <h3>Geräte</h3>
+            <div id="scc-rules-list"></div>
+        </section>
+    </footer>
     <div id="scc-details"></div>
 
     <!-- Wie echarts/adapter-react: Admin-Socket laden, dann bei Bereitstellung nutzen -->
@@ -605,19 +608,27 @@
                     if (autarkyVal) autarkyVal.textContent = '–';
                     var forecastContent = document.getElementById('scc-forecast-content');
                     if (forecastContent) forecastContent.innerHTML = '';
+                    var simBannerNoData = document.getElementById('scc-simulation-banner');
+                    if (simBannerNoData) simBannerNoData.style.display = 'none';
+                    window.__sccLastUpdate = null;
+                    try { document.body.classList.remove('scc-has-data'); } catch (e) {}
                     return;
                 }
 
+                window.__sccLastUpdate = Date.now();
+                try { document.body.classList.add('scc-has-data'); } catch (e) {}
                 sccLog('render: Daten', data.surplus.powerW, 'W Überschuss');
                 var autarkyPct = data.autarky && data.autarky.percent != null ? data.autarky.percent : null;
                 var autarkyValEl = document.getElementById('scc-autarky-value');
                 if (autarkyValEl) autarkyValEl.textContent = autarkyPct != null ? Math.round(autarkyPct) : '–';
+                var autarkyBlock = document.getElementById('scc-autarky-block');
+                if (autarkyBlock) autarkyBlock.classList.toggle('scc-autarky-full', autarkyPct >= 100);
 
                 var forecastContent = document.getElementById('scc-forecast-content');
                 if (forecastContent) {
                     if (data.forecast && data.forecast.enabled) {
                         var fw = data.forecast.powerW != null ? Number(data.forecast.powerW) : null;
-                        forecastContent.innerHTML = '<p class="scc-forecast-line"><span class="scc-forecast-label">Vorhersage (Leistung)</span> <span class="scc-forecast-value">' + (fw != null ? formatW(fw) : '–') + '</span></p>';
+                        forecastContent.innerHTML = '<p class="scc-forecast-line"><span class="scc-forecast-label">Vorhersage (Leistung)</span> <span class="scc-forecast-value">' + (fw != null && !isNaN(fw) ? formatW(fw) : '–') + '</span></p>';
                     } else {
                         forecastContent.innerHTML = '<p class="scc-muted-small">Nicht aktiv. In der Adapter-Konfiguration „PV-Vorhersage aktiv“ und einen Vorhersage-Datenpunkt eintragen.</p>';
                     }
@@ -698,17 +709,40 @@
                 }
                 if (rulesListEl) {
                     var rlist = (data.rulesList && data.rulesList.length) ? data.rulesList : [];
+                    var simOn = !!(data.simulationMode === true);
+                    var powerOnSvg = '<svg class="scc-device-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>';
+                    var powerOffSvg = '<svg class="scc-device-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>';
                     rulesListEl.innerHTML = rlist.length === 0
                         ? '<p class="scc-muted-small">Keine Geräte mit Namen.</p>'
-                        : '<ul class="scc-named-list">' + rlist.map(function (item) {
+                        : '<div class="scc-devices-grid">' + rlist.map(function (item) {
                             var label = (item.name && item.name.trim()) ? item.name.trim() : (item.ruleId || '–');
-                            return '<li><span class="scc-named-label" title="' + (item.ruleId || '') + '">' + escapeHtml(label) + '</span><span class="scc-named-value scc-named-state ' + (item.state ? 'on' : 'off') + '">' + (item.state ? 'Ein' : 'Aus') + '</span></li>';
-                        }).join('') + '</ul>';
+                            var isOn = !!item.state;
+                            var icon = isOn ? powerOnSvg : powerOffSvg;
+                            return '<div class="scc-device-card scc-device-card--' + (isOn ? 'on' : 'off') + '" title="' + escapeHtml(item.ruleId || '') + '">' +
+                                '<span class="scc-device-icon-wrap">' + icon + '</span>' +
+                                '<span class="scc-device-label">' + escapeHtml(label) + '</span>' +
+                                '<span class="scc-device-state">' + (isOn ? 'EIN' : 'AUS') + '</span>' +
+                                '</div>';
+                        }).join('') + '</div>' + (simOn ? '<p class="scc-devices-sim-hint">Simulation aktiv – Schaltbefehle werden nicht ausgeführt</p>' : '');
                 }
+                var simBanner = document.getElementById('scc-simulation-banner');
+                if (simBanner) simBanner.style.display = (data.simulationMode === true) ? '' : 'none';
 
                 updatePowerViz(data);
                 if (status) status.textContent = instanceId + ' – aktualisiert';
                 if (details) details.innerHTML = '';
+                updateStatusTime();
+            }
+
+            function updateStatusTime() {
+                var status = document.getElementById('scc-status');
+                if (!status) return;
+                var t = window.__sccLastUpdate;
+                if (t == null) return;
+                var sec = Math.floor((Date.now() - t) / 1000);
+                if (sec <= 1) status.textContent = instanceId + ' – gerade aktualisiert';
+                else if (sec < 60) status.textContent = instanceId + ' – vor ' + sec + ' s';
+                else status.textContent = instanceId + ' – vor ' + Math.floor(sec / 60) + ' min';
             }
 
             function getPowerVizHtml(data) {
@@ -765,7 +799,16 @@
                 if (totalIn < 1) totalIn = 1;
                 if (totalOut < 1) totalOut = 1;
 
-                container.innerHTML = getPowerVizHtml(data);
+                var existingScale = container.querySelector('.scc-evcc-scale');
+                var consCount = consumptionSources.length > 0 ? consumptionSources.length : -1;
+                var built = container.getAttribute('data-evcc-built');
+                var builtCons = parseInt(container.getAttribute('data-evcc-cons-count') || '-1', 10);
+                if (!existingScale || built !== '1' || builtCons !== consCount) {
+                    container.innerHTML = getPowerVizHtml(data);
+                    container.setAttribute('data-evcc-built', '1');
+                    container.setAttribute('data-evcc-cons-count', String(consCount));
+                }
+
                 var inBars = container.querySelector('.scc-evcc-scale:first-child .scc-evcc-bars');
                 var outBars = container.querySelectorAll('.scc-evcc-scale')[1] && container.querySelectorAll('.scc-evcc-scale')[1].querySelector('.scc-evcc-bars');
                 if (inBars) {
@@ -823,7 +866,16 @@
                 useInjectedSocket();
                 run();
                 if (!window.__sccInterval) window.__sccInterval = setInterval(run, 2000);
+                if (!window.__sccStatusInterval) window.__sccStatusInterval = setInterval(updateStatusTime, 1000);
             };
+            document.addEventListener('visibilitychange', function () {
+                if (document.hidden) {
+                    if (window.__sccInterval) { clearInterval(window.__sccInterval); window.__sccInterval = null; }
+                } else {
+                    run();
+                    if (!window.__sccInterval) window.__sccInterval = setInterval(run, 2000);
+                }
+            });
 
             window.addEventListener('message', function (e) {
                 if (!e || !e.data || e.data.type !== 'scc-flow-states') return;
@@ -862,6 +914,7 @@
             }
             scheduleRun();
             if (!window.__sccInterval) window.__sccInterval = setInterval(run, 2000);
+            if (!window.__sccStatusInterval) window.__sccStatusInterval = setInterval(updateStatusTime, 1000);
             setTimeout(run, 100);
             setTimeout(run, 500);
             setTimeout(run, 1200);

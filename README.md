@@ -40,7 +40,7 @@ iobroker add scc
 - **Quellen:** Datenpunkte mit Typ (Erzeugung, Verbrauch, Netzleistung, Einspeisung). Z. B. ein Shelly Pro 3 EM am Hausanschluss als **eine** Quelle „Netzleistung“ (negativ = Einspeisung).
 - **Batterien:** Pro Speicher SoC-State (%), optional Lade-/Entlade-State (W), Ziel-SoC, Name.
 - **Überschuss-Priorität:** „Batterie zuerst“ (Standard) oder „Geräte zuerst“.
-- **Regeln:** Pro Gerät Ziel-State (z. B. Shelly-Steckdose), Schwellwert EIN/AUS (W), Hysterese, Min.-Dauer, Verzögerung.
+- **Regeln:** Pro Gerät Ziel-State (z. B. Shelly-Steckdose), **Geräteleistung (W)** (typ. Verbrauch), Schwellwert EIN/AUS (W), Hysterese, Min.-Dauer, Verzögerung. **EIN ab** sollte ≥ Geräteleistung + Puffer sein (z. B. Gerät 2000 W → EIN ab 2200 W), damit beim Einschalten kein Netz-/Batteriebezug entsteht; bei gesetzter Geräteleistung schaltet EIN nur, wenn „für Verbraucher verfügbar“ ≥ max(EIN ab, Geräteleistung).
 - **Optionen:** Schwellwert „Überschuss an“, Pauschale Batterie-Reserve (W), PV-Vorhersage (optional), Hausverbrauch aus Bilanz berechnen (optional).
 
 Details und Datenmodell siehe [CONCEPT.md](CONCEPT.md).

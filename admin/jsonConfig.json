@@ -40,6 +40,13 @@
           ],
           "help": "Batterie zuerst: Speicher wird vor den Schalt-Geräten bedient. Geräte zuerst: Gesamter Überschuss für WP/Steckdosen, Batterie lädt mit dem Rest."
         },
+        "surplusDevicesOnlyFromSurplus": {
+          "type": "checkbox",
+          "label": "Überschussgeräte nur mit echtem Überschuss",
+          "sm": 6,
+          "newLine": true,
+          "help": "Wenn aktiv: Geräte nur bei echtem PV-Überschuss (nach Batterie/Netz), nicht wenn die Batterie entlädt. Entladeleistung zählt dann nicht als „für Verbraucher verfügbar“."
+        },
         "pollIntervalMs": {
           "type": "number",
           "label": "Aktualisierungsintervall (ms)",
@@ -209,7 +216,7 @@
       "items": {
         "_rulesHelp": {
           "type": "staticText",
-          "text": "Eine Zeile = eine Regel. Ziel = Datenpunkt zum Schalten (z. B. Steckdose, WP). EIN ab = Schwellwert (W). AUS unter = Hysterese. Min. EIN/AUS = Mindestdauer. Priorität: niedrigere Zahl = zuerst. Bei Problemen: Debug-Log aktivieren.",
+          "text": "Eine Zeile = eine Regel. Ziel = Datenpunkt zum Schalten (z. B. Steckdose, WP). Geräteleistung = typ. Verbrauch des Geräts (W). EIN ab sollte ≥ Geräteleistung + Puffer sein (z. B. Gerät 2000 W → EIN ab 2200 W), damit beim Einschalten kein Netz-/Batteriebezug entsteht. AUS unter = Hysterese. Min. EIN/AUS = Mindestdauer. Priorität: niedrigere Zahl = zuerst.",
           "newLine": true
         },
         "rules": {
@@ -219,6 +226,7 @@
           "items": [
             { "attr": "targetStateId", "name": "targetStateId", "type": "objectId", "label": "Ziel (Schalten)", "title": "Ziel (Schalten)", "customFilter": { "common": { "role": ["switch", "button", "state"] } } },
             { "attr": "name", "name": "name", "type": "text", "label": "Name (Alias)", "title": "Name (Alias)" },
+            { "attr": "devicePowerW", "name": "devicePowerW", "type": "number", "label": "Geräteleistung (W)", "title": "Geräteleistung (W)", "min": 0, "max": 100000, "help": "Typ. Verbrauch des Geräts. EIN wird nur geschaltet, wenn verfügbar ≥ max(EIN ab, Geräteleistung). 0 = ignorieren." },
             { "attr": "thresholdOn", "name": "thresholdOn", "type": "number", "label": "EIN ab (W)", "title": "EIN ab (W)", "min": 0, "max": 100000 },
             { "attr": "thresholdOff", "name": "thresholdOff", "type": "number", "label": "AUS unter (W)", "title": "AUS unter (W)", "min": 0, "max": 100000 },
             { "attr": "minOnSec", "name": "minOnSec", "type": "number", "label": "Min. EIN (s)", "title": "Min. EIN (s)", "min": 0, "max": 3600 },
