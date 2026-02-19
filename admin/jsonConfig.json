@@ -214,27 +214,112 @@
       "type": "panel",
       "label": { "de": "Regeln", "en": "Rules" },
       "items": {
-        "_rulesHelp": {
-          "type": "staticText",
-          "text": { "de": "Eine Zeile = eine Regel. Ziel = Datenpunkt zum Schalten (z. B. Steckdose, WP). Geräteleistung = typ. Verbrauch des Geräts (W). EIN ab sollte ≥ Geräteleistung + Puffer sein (z. B. Gerät 2000 W → EIN ab 2200 W), damit beim Einschalten kein Netz-/Batteriebezug entsteht. AUS unter = Hysterese. Min. EIN/AUS = Mindestdauer. Priorität: niedrigere Zahl = zuerst.", "en": "One row = one rule. Target = state to switch (e.g. socket, heat pump). Device power = typical consumption (W). ON above should be ≥ device power + margin (e.g. 2000 W device → ON above 2200 W) so no grid/battery is used when switching on. OFF below = hysteresis. Min ON/OFF = minimum duration. Priority: lower number = first." },
+        "_rulesFlowHintHeader": {
+          "type": "header",
+          "text": { "de": "💡 Regeln im Flow-Tab einstellen", "en": "💡 Configure rules in the Flow tab" },
+          "size": 3,
           "newLine": true
         },
-        "rules": {
+        "_rulesFlowHint": {
+          "type": "staticText",
+          "text": { "de": "Im Tab „Flow“ (oben in der Instanz-Ansicht) können Sie Regeln übersichtlich bearbeiten: Button „Regeln“ klicken → Dialog mit Datenpunkt-Picker und Erklärungen.", "en": "In the „Flow“ tab (at the top of the instance view) you can edit rules in a clear dialog: click the „Regeln“ button for the state picker and explanations." },
+          "newLine": true
+        },
+        "_rulesFlowDivider": {
+          "type": "divider",
+          "newLine": true
+        },
+        "_rulesHelp": {
+          "type": "staticText",
+          "text": { "de": "Priorität gilt für beide Bereiche. Bei PID: „Aktiv wenn“ (Datenpunkt ≤ Wert, UND) und Override (alle UND / mind. eine ODER).", "en": "Priority applies to both sections. For PID: \"Active when\" (state ≤ value, AND) and Override (all AND / at least one OR)." },
+          "newLine": true
+        },
+        "_headerOnOff": {
+          "type": "header",
+          "text": { "de": "EIN/AUS (Schwellwert)", "en": "ON/OFF (threshold)" },
+          "size": 4,
+          "newLine": true
+        },
+        "_helpOnOff": {
+          "type": "staticText",
+          "text": { "de": "Steckdosen, Wärmepumpe o. ä. ab Überschuss ein- und ausschalten.", "en": "Switch sockets, heat pump etc. based on surplus." },
+          "newLine": false
+        },
+        "rulesOnOff": {
           "type": "table",
           "label": { "de": "Regeln", "en": "Rules" },
           "newLine": true,
           "items": [
-            { "attr": "targetStateId", "name": "targetStateId", "type": "objectId", "label": { "de": "Ziel (Schalten)", "en": "Target (switch)" }, "title": { "de": "Ziel (Schalten)", "en": "Target (switch)" }, "customFilter": { "common": { "role": ["switch", "button", "state"] } } },
-            { "attr": "name", "name": "name", "type": "text", "label": { "de": "Name (Alias)", "en": "Name (alias)" }, "title": { "de": "Name (Alias)", "en": "Name (alias)" } },
-            { "attr": "devicePowerW", "name": "devicePowerW", "type": "number", "label": { "de": "Geräteleistung (W)", "en": "Device power (W)" }, "title": { "de": "Geräteleistung (W)", "en": "Device power (W)" }, "min": 0, "max": 100000, "help": { "de": "Typ. Verbrauch des Geräts. EIN wird nur geschaltet, wenn verfügbar ≥ max(EIN ab, Geräteleistung). 0 = ignorieren.", "en": "Typical device consumption. ON only when available ≥ max(ON above, device power). 0 = ignore." } },
+            { "attr": "targetStateId", "name": "targetStateId", "type": "objectId", "label": { "de": "Ziel (Schalten)", "en": "Target (switch)" }, "title": { "de": "Ziel", "en": "Target" }, "customFilter": { "common": { "role": ["switch", "button", "state"] } } },
+            { "attr": "name", "name": "name", "type": "text", "label": { "de": "Name", "en": "Name" }, "title": { "de": "Name", "en": "Name" } },
+            { "attr": "devicePowerW", "name": "devicePowerW", "type": "number", "label": { "de": "Geräteleistung (W)", "en": "Device power (W)" }, "title": { "de": "Leistung (W)", "en": "Power (W)" }, "min": 0, "max": 100000 },
             { "attr": "thresholdOn", "name": "thresholdOn", "type": "number", "label": { "de": "EIN ab (W)", "en": "ON above (W)" }, "title": { "de": "EIN ab (W)", "en": "ON above (W)" }, "min": 0, "max": 100000 },
             { "attr": "thresholdOff", "name": "thresholdOff", "type": "number", "label": { "de": "AUS unter (W)", "en": "OFF below (W)" }, "title": { "de": "AUS unter (W)", "en": "OFF below (W)" }, "min": 0, "max": 100000 },
-            { "attr": "minOnSec", "name": "minOnSec", "type": "number", "label": { "de": "Min. EIN (s)", "en": "Min. ON (s)" }, "title": { "de": "Min. EIN (s)", "en": "Min. ON (s)" }, "min": 0, "max": 3600 },
-            { "attr": "minOffSec", "name": "minOffSec", "type": "number", "label": { "de": "Min. AUS (s)", "en": "Min. OFF (s)" }, "title": { "de": "Min. AUS (s)", "en": "Min. OFF (s)" }, "min": 0, "max": 3600 },
-            { "attr": "delayOnSec", "name": "delayOnSec", "type": "number", "label": { "de": "Verz. EIN (s)", "en": "Delay ON (s)" }, "title": { "de": "Verz. EIN (s)", "en": "Delay ON (s)" }, "min": 0, "max": 600 },
-            { "attr": "delayOffSec", "name": "delayOffSec", "type": "number", "label": { "de": "Verz. AUS (s)", "en": "Delay OFF (s)" }, "title": { "de": "Verz. AUS (s)", "en": "Delay OFF (s)" }, "min": 0, "max": 600 },
+            { "attr": "minOnSec", "name": "minOnSec", "type": "number", "label": { "de": "Min. EIN (s)", "en": "Min. ON (s)" }, "title": { "de": "Min. EIN", "en": "Min. ON" }, "min": 0, "max": 3600 },
+            { "attr": "minOffSec", "name": "minOffSec", "type": "number", "label": { "de": "Min. AUS (s)", "en": "Min. OFF (s)" }, "title": { "de": "Min. AUS", "en": "Min. OFF" }, "min": 0, "max": 3600 },
+            { "attr": "delayOnSec", "name": "delayOnSec", "type": "number", "label": { "de": "Verz. EIN (s)", "en": "Delay ON (s)" }, "title": { "de": "Verz. EIN", "en": "Delay ON" }, "min": 0, "max": 600 },
+            { "attr": "delayOffSec", "name": "delayOffSec", "type": "number", "label": { "de": "Verz. AUS (s)", "en": "Delay OFF (s)" }, "title": { "de": "Verz. AUS", "en": "Delay OFF" }, "min": 0, "max": 600 },
             { "attr": "priority", "name": "priority", "type": "number", "label": { "de": "Priorität", "en": "Priority" }, "title": { "de": "Priorität", "en": "Priority" }, "min": 0, "max": 100 },
             { "attr": "enabled", "name": "enabled", "type": "checkbox", "label": { "de": "Aktiv", "en": "Active" }, "title": { "de": "Aktiv", "en": "Active" } }
+          ]
+        },
+        "_divider1": {
+          "type": "divider",
+          "newLine": true
+        },
+        "_headerPid": {
+          "type": "header",
+          "text": { "de": "PID (0–100 %)", "en": "PID (0–100%)" },
+          "size": 4,
+          "newLine": true
+        },
+        "_helpPid": {
+          "type": "staticText",
+          "text": { "de": "Stetige Regelung (0–100 %), z. B. Heizstab oder Dimmer. Der Regler vergleicht einen Eingang (Überschuss W, Leistungs-Datenpunkt oder Temperatur) mit einem Sollwert und passt den Ausgang an. EIN ab / AUS unter = Schwellen in W, ab/bis zu denen geregelt wird (0 = immer / nur bei ≤0). Xp = Empfindlichkeit (kleiner = stärker), Tn = Nachstellzeit (s).", "en": "Continuous control (0–100%), e.g. heating or dimmer. The controller compares an input (surplus W, power state or temperature) with a setpoint and adjusts the output. EIN ab / AUS unter = thresholds in W (0 = always / only when ≤0). Xp = sensitivity (smaller = stronger), Tn = integral time (s)." },
+          "newLine": false
+        },
+        "_helpPidDetail": {
+          "type": "staticText",
+          "text": { "de": "Logik: Fehler = Sollwert − Istwert. Ist der Istwert unter dem Soll (z. B. zu wenig Überschuss oder zu kalt), erhöht der Regler den Ausgang; sonst senkt er ihn. Ausgang wird auf 0–100 % begrenzt. EIN ab / AUS unter (W) schalten die Regelung nur im Überschuss-/Leistungs-Modus ein bzw. aus. Übertemperatur: Wenn Temp-State und „Abschalten ab (°C)“ gesetzt sind und die Temperatur ≥ diesem Wert ist, wird der Ausgang auf 0 % gesetzt.", "en": "Logic: error = setpoint − actual. If actual is below setpoint (e.g. too little surplus or too cold), output increases; otherwise it decreases. Output is clamped to 0–100%. EIN ab / AUS unter (W) only apply when input is surplus or power. Overtemp: If temp state and \"Switch off above (°C)\" are set and temperature ≥ that value, output is set to 0%." },
+          "newLine": false
+        },
+        "rulesPid": {
+          "type": "table",
+          "label": { "de": "Regeln", "en": "Rules" },
+          "newLine": true,
+          "items": [
+            { "attr": "targetStateId", "name": "targetStateId", "type": "objectId", "label": { "de": "Ausgang 0–100 %", "en": "Output 0–100%" }, "title": { "de": "Ausgang", "en": "Out" }, "customFilter": { "common": { "type": "number" } } },
+            { "attr": "name", "name": "name", "type": "text", "label": { "de": "Name", "en": "Name" }, "title": { "de": "Name", "en": "Name" } },
+            { "attr": "pidInputSource", "name": "pidInputSource", "type": "select", "label": { "de": "Eingang", "en": "Input" }, "title": { "de": "Eingang", "en": "In" }, "options": [
+              { "value": "surplus", "label": { "de": "Überschuss (W)", "en": "Surplus (W)" } },
+              { "value": "state", "label": { "de": "Datenpunkt Leistung (W)", "en": "State power (W)" } },
+              { "value": "temperature", "label": { "de": "Temperaturfühler (°C)", "en": "Temperature sensor (°C)" } }
+            ] },
+            { "attr": "pidInputStateId", "name": "pidInputStateId", "type": "objectId", "label": { "de": "Eingang / Temp-Fühler", "en": "Input / temp sensor" }, "title": { "de": "DP", "en": "DP" }, "customFilter": { "common": { "type": "number" } } },
+            { "attr": "pidSetpointW", "name": "pidSetpointW", "type": "number", "label": { "de": "Sollwert (W)", "en": "Setpoint (W)" }, "title": { "de": "Soll W", "en": "Set W" }, "min": -100000, "max": 100000, "default": 250 },
+            { "attr": "pidSetpointTemp", "name": "pidSetpointTemp", "type": "number", "label": { "de": "Sollwert (°C)", "en": "Setpoint (°C)" }, "title": { "de": "Soll °C", "en": "Set °C" }, "min": -50, "max": 200, "default": 50 },
+            { "attr": "pidThresholdOnW", "name": "pidThresholdOnW", "type": "number", "label": { "de": "EIN ab (W)", "en": "ON above (W)" }, "title": { "de": "EIN ab", "en": "ON" }, "min": 0, "max": 100000 },
+            { "attr": "pidThresholdOffW", "name": "pidThresholdOffW", "type": "number", "label": { "de": "AUS unter (W)", "en": "OFF below (W)" }, "title": { "de": "AUS unter", "en": "OFF" }, "min": 0, "max": 100000 },
+            { "attr": "tempLimitStateId", "name": "tempLimitStateId", "type": "objectId", "label": { "de": "Übertemperatur Temp-State", "en": "Overtemp temp state" }, "title": { "de": "Temp-Limit", "en": "TempLim" }, "customFilter": { "common": { "type": "number" } } },
+            { "attr": "tempLimitMax", "name": "tempLimitMax", "type": "number", "label": { "de": "Abschalten ab (°C)", "en": "Switch off above (°C)" }, "title": { "de": "Max °C", "en": "Max°C" }, "min": -50, "max": 200 },
+            { "attr": "pidXp", "name": "pidXp", "type": "number", "label": { "de": "Xp", "en": "Xp" }, "title": { "de": "Xp", "en": "Xp" }, "min": 0.1, "max": 1000000, "default": 20000 },
+            { "attr": "pidTn", "name": "pidTn", "type": "number", "label": { "de": "Tn", "en": "Tn" }, "title": { "de": "Tn", "en": "Tn" }, "min": 0.1, "max": 1000, "default": 9 },
+            { "attr": "priority", "name": "priority", "type": "number", "label": { "de": "Priorität", "en": "Priority" }, "title": { "de": "Prio", "en": "Prio" }, "min": 0, "max": 100 },
+            { "attr": "enabled", "name": "enabled", "type": "checkbox", "label": { "de": "Aktiv", "en": "Active" }, "title": { "de": "Aktiv", "en": "On" } },
+            { "attr": "enableCondition1StateId", "name": "enableCondition1StateId", "type": "objectId", "label": { "de": "Aktiv wenn 1 (Datenpunkt)", "en": "Active when 1 (state)" }, "title": { "de": "Akt.1", "en": "Act.1" }, "customFilter": { "common": { "type": "number" } } },
+            { "attr": "enableCondition1Max", "name": "enableCondition1Max", "type": "number", "label": { "de": "Aktiv wenn 1 (≤)", "en": "Active when 1 (≤)" }, "title": { "de": "≤1", "en": "≤1" }, "min": -1e9, "max": 1e9 },
+            { "attr": "enableCondition2StateId", "name": "enableCondition2StateId", "type": "objectId", "label": { "de": "Aktiv wenn 2 (Datenpunkt)", "en": "Active when 2 (state)" }, "title": { "de": "Akt.2", "en": "Act.2" }, "customFilter": { "common": { "type": "number" } } },
+            { "attr": "enableCondition2Max", "name": "enableCondition2Max", "type": "number", "label": { "de": "Aktiv wenn 2 (≤)", "en": "Active when 2 (≤)" }, "title": { "de": "≤2", "en": "≤2" }, "min": -1e9, "max": 1e9 },
+            { "attr": "pidOverrideValue", "name": "pidOverrideValue", "type": "number", "label": { "de": "Override (%)", "en": "Override (%)" }, "title": { "de": "Over%", "en": "Over%" }, "min": 0, "max": 100 },
+            { "attr": "overrideConditionMode", "name": "overrideConditionMode", "type": "select", "label": { "de": "Override Verknüpfung", "en": "Override condition" }, "title": { "de": "Verkn.", "en": "Link" }, "options": [
+              { "value": "all", "label": { "de": "Alle UND", "en": "All AND" } },
+              { "value": "any", "label": { "de": "Mind. eine ODER", "en": "Any OR" } }
+            ] },
+            { "attr": "overrideTotalStateId", "name": "overrideTotalStateId", "type": "objectId", "label": { "de": "Override Total", "en": "Override total" }, "title": { "de": "Over.Total", "en": "Over.Tot" } },
+            { "attr": "overrideTotalMax", "name": "overrideTotalMax", "type": "number", "label": { "de": "Override Total max", "en": "Override total max" }, "title": { "de": "Total≤", "en": "Tot≤" }, "min": -1e9, "max": 1e9 },
+            { "attr": "overridePowerMax", "name": "overridePowerMax", "type": "number", "label": { "de": "Override Leistung max (W)", "en": "Override power max (W)" }, "title": { "de": "Power≤", "en": "Pwr≤" }, "min": 0, "max": 100000 },
+            { "attr": "overrideTempStateId", "name": "overrideTempStateId", "type": "objectId", "label": { "de": "Override Temp", "en": "Override temp" }, "title": { "de": "Over.Temp", "en": "Over.T" }, "customFilter": { "common": { "type": "number" } } },
+            { "attr": "overrideTempMax", "name": "overrideTempMax", "type": "number", "label": { "de": "Override Temp max", "en": "Override temp max" }, "title": { "de": "Temp≤", "en": "T≤" }, "min": -100, "max": 200 }
           ]
         }
       }

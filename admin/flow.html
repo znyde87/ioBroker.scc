@@ -8,13 +8,16 @@
 <body class="scc-flow">
     <header class="scc-dash-header">
         <h2>PV-Überschuss – Energiefluss</h2>
-        <p id="scc-simulation-banner" class="scc-simulation-banner" role="status" aria-live="polite" style="display:none;">Simulation aktiv – es wird nicht geschaltet</p>
+        <p id="scc-simulation-banner" class="scc-simulation-banner" role="status" aria-live="polite" style="display:none;">Simulation aktiv – es wird nicht geschaltet <button type="button" id="scc-pid-sim-btn" class="scc-btn scc-btn-sm scc-pid-sim-btn">PID-Logik anzeigen</button></p>
         <p class="scc-refresh">
             <button id="scc-refresh" type="button" class="scc-btn-icon" title="Aktualisieren" aria-label="Aktualisieren">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
             </button>
             <button id="scc-open-standalone" type="button" class="scc-btn-icon" title="Als Einzelseite öffnen" aria-label="Als Einzelseite öffnen">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            </button>
+            <button id="scc-open-rules" type="button" class="scc-btn-icon" title="Regeln anzeigen" aria-label="Regeln anzeigen">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
             </button>
             <span id="scc-status" class="scc-status"></span>
         </p>
@@ -72,6 +75,141 @@
         </section>
     </footer>
     <div id="scc-details"></div>
+
+    <!-- Modal: Regeln (EIN/AUS + PID) – anzeigen und anlegen/bearbeiten -->
+    <div id="scc-rules-modal" class="scc-modal" role="dialog" aria-modal="true" aria-labelledby="scc-rules-modal-title" aria-hidden="true">
+        <div class="scc-modal-backdrop" id="scc-rules-modal-backdrop"></div>
+        <div class="scc-modal-box">
+            <header class="scc-modal-header">
+                <h2 id="scc-rules-modal-title">Regeln</h2>
+                <button type="button" class="scc-modal-close" id="scc-rules-modal-close" aria-label="Schließen">&times;</button>
+            </header>
+            <div class="scc-modal-body">
+                <p class="scc-modal-hint">Regeln hier anzeigen und bearbeiten. Nach dem Speichern ggf. Instanz neu starten.</p>
+                <div id="scc-rules-form-wrap" class="scc-rules-form-wrap" style="display:none;">
+                    <div id="scc-rules-form-onoff" class="scc-rules-form-panel">
+                        <h4>EIN/AUS-Regel</h4>
+                        <div class="scc-form-grid">
+                            <label>Ziel (State-ID)</label>
+                            <div class="scc-input-with-picker">
+                                <input type="text" id="scc-f-targetStateId" placeholder="z.B. shelly.0.Switch" class="scc-input">
+                                <button type="button" class="scc-picker-btn" data-target="scc-f-targetStateId" title="Datenpunkt auswählen">…</button>
+                            </div>
+                            <label>Name</label><input type="text" id="scc-f-name" placeholder="z.B. Heizstab" class="scc-input">
+                            <label>Geräteleistung (W)</label><input type="number" id="scc-f-devicePowerW" min="0" value="0" class="scc-input">
+                            <label>EIN ab (W)</label><input type="number" id="scc-f-thresholdOn" min="0" value="200" class="scc-input">
+                            <label>AUS unter (W)</label><input type="number" id="scc-f-thresholdOff" min="0" value="100" class="scc-input">
+                            <label>Min. EIN (s)</label><input type="number" id="scc-f-minOnSec" min="0" value="0" class="scc-input">
+                            <label>Min. AUS (s)</label><input type="number" id="scc-f-minOffSec" min="0" value="0" class="scc-input">
+                            <label>Verz. EIN (s)</label><input type="number" id="scc-f-delayOnSec" min="0" value="0" class="scc-input">
+                            <label>Verz. AUS (s)</label><input type="number" id="scc-f-delayOffSec" min="0" value="0" class="scc-input">
+                            <label>Priorität</label><input type="number" id="scc-f-priority" min="0" max="100" value="0" class="scc-input">
+                            <label class="scc-checkbox-label"><input type="checkbox" id="scc-f-enabled" checked> Aktiv</label>
+                        </div>
+                    </div>
+                    <div id="scc-rules-form-pid" class="scc-rules-form-panel" style="display:none;">
+                        <h4>PID-Regel (0–100 %)</h4>
+                        <div class="scc-pid-help">
+                            <p><strong>Was macht die PID-Regel?</strong> Sie steuert einen Ausgang stetig zwischen 0 und 100 % (z. B. Shelly Dimmer, Heizstab). Der Regler vergleicht einen <em>Eingang</em> mit einem <em>Sollwert</em> und passt den Ausgang an.</p>
+                            <p><strong>Eingang:</strong> Wählen Sie, worauf geregelt werden soll: <em>Überschuss (W)</em> = verfügbarer Überschuss; <em>Datenpunkt Leistung</em> = aktuelle Leistung aus einem State; <em>Temperaturfühler</em> = Ist-Temperatur für Heizstab-Regelung.</p>
+                            <p><strong>Sollwert (W oder °C):</strong> Der Regler versucht, den Eingang an diesen Wert heranzuführen. Bei Überschuss z. B. 250 W = „möchte ca. 250 W nutzen“. Bei Temperatur z. B. 50 °C = „Zieltemperatur 50 °C“.</p>
+                            <p><strong>EIN ab / AUS unter (W):</strong> Nur bei Eingang „Überschuss“ oder „Datenpunkt“: Ab „EIN ab“ (W) läuft die Regelung; unter „AUS unter“ (W) wird 0 % ausgegeben. 0 = immer aktiv bzw. nur bei ≤0 aus.</p>
+                            <p><strong>Übertemperatur-Schutz:</strong> Optional: Temp-State (z. B. Speicher oben) und „Abschalten ab (°C)“ (z. B. 60). Sobald die Temperatur ≥ diesem Wert ist, wird der Ausgang auf 0 % gesetzt – unabhängig von der Regelung.</p>
+                            <p><strong>Xp und Tn:</strong> Regler-Empfindlichkeit. <em>Xp</em> kleiner = stärkere Reaktion (z. B. 10000–20000 für Überschuss). <em>Tn</em> = Nachstellzeit in Sekunden (z. B. 9). Erst die Standardwerte testen, bei Bedarf anpassen.</p>
+                        </div>
+                        <div class="scc-form-grid">
+                            <label>Ausgang (State-ID 0–100 %)</label>
+                            <div class="scc-input-with-picker">
+                                <input type="text" id="scc-f-pid-targetStateId" placeholder="z.B. shelly.0.Brightness" class="scc-input">
+                                <button type="button" class="scc-picker-btn" data-target="scc-f-pid-targetStateId" title="Datenpunkt auswählen">…</button>
+                            </div>
+                            <label>Name</label><input type="text" id="scc-f-pid-name" placeholder="z.B. Heizstab Dimmer" class="scc-input">
+                            <label>Eingang</label>
+                            <select id="scc-f-pidInputSource" class="scc-input">
+                                <option value="surplus">Überschuss (W)</option>
+                                <option value="state">Datenpunkt Leistung (W)</option>
+                                <option value="temperature">Temperaturfühler (°C)</option>
+                            </select>
+                            <label>Eingang / Temp-State (bei Datenpunkt/Temp)</label>
+                            <div class="scc-input-with-picker">
+                                <input type="text" id="scc-f-pidInputStateId" placeholder="z.B. 0_userdata.0.temp" class="scc-input">
+                                <button type="button" class="scc-picker-btn" data-target="scc-f-pidInputStateId" title="Datenpunkt auswählen">…</button>
+                            </div>
+                            <label>Sollwert (W)</label><input type="number" id="scc-f-pidSetpointW" value="250" class="scc-input">
+                            <label>Sollwert (°C)</label><input type="number" id="scc-f-pidSetpointTemp" value="50" class="scc-input">
+                            <label>EIN ab (W)</label><input type="number" id="scc-f-pidThresholdOnW" min="0" value="0" class="scc-input">
+                            <label>AUS unter (W)</label><input type="number" id="scc-f-pidThresholdOffW" min="0" value="0" class="scc-input">
+                            <label>Übertemperatur: Temp-State</label>
+                            <div class="scc-input-with-picker">
+                                <input type="text" id="scc-f-tempLimitStateId" placeholder="z.B. Speicher oben (°C)" class="scc-input">
+                                <button type="button" class="scc-picker-btn" data-target="scc-f-tempLimitStateId" title="Datenpunkt auswählen">…</button>
+                            </div>
+                            <label>Abschalten ab (°C)</label><input type="number" id="scc-f-tempLimitMax" min="-50" max="200" placeholder="z.B. 60" class="scc-input" title="Leer = kein Limit. Wenn Temp ≥ Wert → Ausgang 0 %">
+                            <label>Xp</label><input type="number" id="scc-f-pidXp" min="0.1" value="20000" step="0.1" class="scc-input">
+                            <label>Tn</label><input type="number" id="scc-f-pidTn" min="0.1" value="9" step="0.1" class="scc-input">
+                            <label>Priorität</label><input type="number" id="scc-f-pid-priority" min="0" max="100" value="0" class="scc-input">
+                            <label class="scc-checkbox-label"><input type="checkbox" id="scc-f-pid-enabled" checked> Aktiv</label>
+                        </div>
+                    </div>
+                    <div class="scc-form-actions">
+                        <button type="button" id="scc-rules-form-save" class="scc-btn scc-btn-primary">Speichern</button>
+                        <button type="button" id="scc-rules-form-cancel" class="scc-btn scc-btn-secondary">Abbrechen</button>
+                    </div>
+                </div>
+                <div id="scc-rules-modal-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- State-Picker-Modal (Datenpunkt aus Liste wählen) -->
+    <div id="scc-state-picker-modal" class="scc-modal scc-picker-modal" role="dialog" aria-hidden="true" style="display:none;">
+        <div class="scc-modal-backdrop" id="scc-state-picker-backdrop"></div>
+        <div class="scc-modal-box scc-picker-box">
+            <header class="scc-modal-header">
+                <h2>Datenpunkt wählen</h2>
+                <button type="button" class="scc-modal-close" id="scc-state-picker-close" aria-label="Schließen">&times;</button>
+            </header>
+            <div class="scc-modal-body">
+                <input type="text" id="scc-state-picker-filter" class="scc-input" placeholder="Filtern (z.B. shelly)…" autocomplete="off">
+                <div id="scc-state-picker-list" class="scc-state-picker-list"></div>
+                <p id="scc-state-picker-status" class="scc-muted scc-state-picker-status"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: PID-Simulation / Logik (nur bei Simulationsmodus, zeigt alle PID-Werte) -->
+    <div id="scc-pid-sim-modal" class="scc-modal" role="dialog" aria-modal="true" aria-labelledby="scc-pid-sim-title" aria-hidden="true" style="display:none;">
+        <div class="scc-modal-backdrop" id="scc-pid-sim-backdrop"></div>
+        <div class="scc-modal-box scc-pid-sim-box">
+            <header class="scc-modal-header">
+                <h2 id="scc-pid-sim-title">PID-Simulation / Logik</h2>
+                <button type="button" class="scc-modal-close" id="scc-pid-sim-close" aria-label="Schließen">&times;</button>
+            </header>
+            <div class="scc-modal-body">
+                <div class="scc-pid-sim-slider-wrap">
+                    <label for="scc-pid-sim-slider" class="scc-pid-sim-slider-label">Überschuss simulieren (W)</label>
+                    <div class="scc-pid-sim-slider-row">
+                        <input type="range" id="scc-pid-sim-slider" class="scc-pid-sim-slider" min="0" max="2000" step="10" value="0" aria-valuemin="0" aria-valuemax="2000" aria-valuenow="0">
+                        <span id="scc-pid-sim-slider-value" class="scc-pid-sim-slider-value">0 W</span>
+                    </div>
+                    <p class="scc-pid-sim-slider-hint">Schreibt in <code>0_userdata.0.PID_Simulation_SCC.Ueberschuss_W</code>. Wenn eine PID-Regel diesen Datenpunkt als Eingang nutzt, reagiert sie beim nächsten Zyklus.</p>
+                </div>
+                <div class="scc-pid-sim-howto">
+                    <h3 class="scc-pid-sim-howto-title">So sind die Werte zu verstehen</h3>
+                    <ul class="scc-pid-sim-howto-list">
+                        <li><strong>Ist (Eingang):</strong> Was gerade gemessen wird – z. B. aktueller Überschuss 0 W oder aktuelle Temperatur.</li>
+                        <li><strong>Soll:</strong> Dein Zielwert – z. B. „möchte 100 W nutzen“ oder „50 °C Speicher“.</li>
+                        <li><strong>Fehler (Soll − Ist):</strong> Wie weit weg du vom Ziel bist. Ist = 0, Soll = 100 → Fehler = 100. Der Regler will diesen Fehler kleiner machen.</li>
+                        <li><strong>P-Anteil:</strong> Reagiert sofort auf den Fehler. Bei großem Xp bleibt P bewusst klein (z. B. 0,5), damit der Ausgang nicht sofort extrem ausschlägt.</li>
+                        <li><strong>I-Anteil:</strong> Summiert den Fehler über die Zeit. War lange „zu wenig“ (Ist &lt; Soll), wird I groß – dann dreht der Regler kräftig auf. Bei deinem Beispiel: I ≈ 90 → treibt den Ausgang hoch.</li>
+                        <li><strong>Ausgang (%):</strong> Ergebnis = P + I (auf 0–100 % begrenzt). <strong>Wichtig bei Überschuss-Eingang:</strong> Der Ausgang wird zusätzlich auf den verfügbaren Überschuss begrenzt – bei 0 W Überschuss bleibt der Ausgang 0 %, bei 50 W Überschuss (Soll 100 W) maximal 50 %. So zieht der Heizstab nie mehr, als da ist.</li>
+                    </ul>
+                    <p class="scc-pid-sim-howto-summary">Kurz: <em>Ist unter Soll → Fehler positiv → Ausgang wird größer</em>. Ist über Soll → Fehler negativ → Ausgang wird kleiner. Bei Überschuss-Eingang gilt immer: Ausgang ≤ (Ist / Soll)·100 %, damit nie mehr genutzt wird als vorhanden.</p>
+                </div>
+                <div id="scc-pid-sim-content" class="scc-pid-sim-content"></div>
+            </div>
+        </div>
+    </div>
 
     <!-- Wie echarts/adapter-react: Admin-Socket laden, dann bei Bereitstellung nutzen -->
     <script>
@@ -200,6 +338,31 @@
                 if (str == null) return '';
                 var s = String(str);
                 return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+            }
+            var sccRuleSparkMax = 60;
+            function sccSparkPaths(data) {
+                if (!data || data.length === 0) return { line: 'M0,12', fill: 'M0,12 L100,12 Z' };
+                var min = Math.min.apply(null, data);
+                var max = Math.max.apply(null, data);
+                var span = (max - min) || 1;
+                var n = data.length;
+                var xScale = n > 1 ? 100 / (n - 1) : 100;
+                var pts = data.map(function (v, i) {
+                    var x = i * xScale;
+                    var y = 12 - ((v - min) / span) * 10 - 1;
+                    return x.toFixed(1) + ',' + y.toFixed(1);
+                });
+                var line = 'M' + pts[0];
+                for (var i = 1; i < pts.length; i++) {
+                    var p = pts[i].split(',');
+                    var prev = pts[i - 1].split(',');
+                    var cx = (parseFloat(prev[0]) + parseFloat(p[0])) / 2;
+                    var cy = (parseFloat(prev[1]) + parseFloat(p[1])) / 2;
+                    line += ' Q' + prev[0] + ',' + prev[1] + ' ' + cx + ',' + cy;
+                }
+                line += ' L' + pts[pts.length - 1];
+                var fill = 'M0,12 L' + pts.join(' ') + ' L100,12 Z';
+                return { line: line, fill: fill };
             }
 
             function flowDataFromStates(states) {
@@ -616,6 +779,7 @@
                 }
 
                 window.__sccLastUpdate = Date.now();
+                window.__sccLastFlowData = data;
                 try { document.body.classList.add('scc-has-data'); } catch (e) {}
                 sccLog('render: Daten', data.surplus.powerW, 'W Überschuss');
                 var autarkyPct = data.autarky && data.autarky.percent != null ? data.autarky.percent : null;
@@ -710,18 +874,56 @@
                 if (rulesListEl) {
                     var rlist = (data.rulesList && data.rulesList.length) ? data.rulesList : [];
                     var simOn = !!(data.simulationMode === true);
+                    if (!window.__sccRuleSpark) window.__sccRuleSpark = {};
+                    rlist.forEach(function (item) {
+                        var rid = item.ruleId || '';
+                        if (!rid) return;
+                        var val = (item.outputPercent != null && typeof item.outputPercent === 'number') ? item.outputPercent : (item.state ? 100 : 0);
+                        if (!window.__sccRuleSpark[rid]) window.__sccRuleSpark[rid] = [];
+                        window.__sccRuleSpark[rid].push(val);
+                        if (window.__sccRuleSpark[rid].length > sccRuleSparkMax) window.__sccRuleSpark[rid].shift();
+                    });
                     var powerOnSvg = '<svg class="scc-device-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>';
                     var powerOffSvg = '<svg class="scc-device-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>';
+                    var pidIconSvg = '<svg class="scc-device-icon scc-pid-card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/><circle cx="12" cy="12" r="3"/></svg>';
                     rulesListEl.innerHTML = rlist.length === 0
                         ? '<p class="scc-muted-small">Keine Geräte mit Namen.</p>'
                         : '<div class="scc-devices-grid">' + rlist.map(function (item) {
                             var label = (item.name && item.name.trim()) ? item.name.trim() : (item.ruleId || '–');
                             var isOn = !!item.state;
+                            var pct = (item.outputPercent != null && typeof item.outputPercent === 'number') ? item.outputPercent : null;
+                            if (pct != null) {
+                                var buf = window.__sccRuleSpark[item.ruleId] || [];
+                                var paths = sccSparkPaths(buf);
+                                var pctStr = Math.round(pct).toString().replace('.', ',');
+                                var tempLine = (item.tempLimitCurrent != null && typeof item.tempLimitCurrent === 'number') ? ('<div class="scc-pid-card-temp">Aktuelle Temperatur: ' + Number(item.tempLimitCurrent).toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' °C</div>') : '';
+                                return '<div class="scc-device-card scc-device-card-pid scc-device-card--' + (isOn ? 'on' : 'off') + '" title="' + escapeHtml(item.ruleId || '') + '">' +
+                                    '<div class="scc-pid-card-top">' +
+                                    '<div class="scc-pid-card-head">' +
+                                    '<span class="scc-pid-card-icon-wrap">' + pidIconSvg + '</span>' +
+                                    '<span class="scc-pid-card-label">' + escapeHtml(label) + '</span>' +
+                                    '</div>' +
+                                    '<div class="scc-pid-card-value-wrap">' +
+                                    '<span class="scc-pid-card-value" data-pid-val>' + pctStr + '</span>' +
+                                    '<span class="scc-pid-card-unit">%</span>' +
+                                    '</div>' +
+                                    '</div>' +
+                                    tempLine +
+                                    '<div class="scc-pid-card-spark" style="height:12px;position:relative;">' +
+                                    '<svg viewBox="0 0 100 12" preserveAspectRatio="none" width="100%" height="100%">' +
+                                    '<path d="M0,12 L100,12" stroke="rgba(255,255,255,.12)" stroke-width="0.8" fill="none"/>' +
+                                    '<path d="' + escapeHtml(paths.fill) + '" fill="rgba(61,220,132,.12)"/>' +
+                                    '<path d="' + escapeHtml(paths.line) + '" stroke="#3ddc84" stroke-linecap="round" stroke-width="0.8" fill="none"/>' +
+                                    '</svg>' +
+                                    '</div>' +
+                                    '</div>';
+                            }
+                            var stateText = isOn ? 'EIN' : 'AUS';
                             var icon = isOn ? powerOnSvg : powerOffSvg;
                             return '<div class="scc-device-card scc-device-card--' + (isOn ? 'on' : 'off') + '" title="' + escapeHtml(item.ruleId || '') + '">' +
                                 '<span class="scc-device-icon-wrap">' + icon + '</span>' +
                                 '<span class="scc-device-label">' + escapeHtml(label) + '</span>' +
-                                '<span class="scc-device-state">' + (isOn ? 'EIN' : 'AUS') + '</span>' +
+                                '<span class="scc-device-state">' + stateText + '</span>' +
                                 '</div>';
                         }).join('') + '</div>' + (simOn ? '<p class="scc-devices-sim-hint">Simulation aktiv – Schaltbefehle werden nicht ausgeführt</p>' : '');
                 }
@@ -732,6 +934,7 @@
                 if (status) status.textContent = instanceId + ' – aktualisiert';
                 if (details) details.innerHTML = '';
                 updateStatusTime();
+                if (typeof window.__sccRefreshPidSimModal === 'function') window.__sccRefreshPidSimModal();
             }
 
             function updateStatusTime() {
@@ -860,6 +1063,667 @@
             if (openStandaloneBtn) openStandaloneBtn.addEventListener('click', function () {
                 window.open(window.location.href, '_blank');
             });
+
+            (function () {
+                var PID_SIM_STATE_ID = '0_userdata.0.PID_Simulation_SCC.Ueberschuss_W';
+                var pidSimBtn = document.getElementById('scc-pid-sim-btn');
+                var pidSimModal = document.getElementById('scc-pid-sim-modal');
+                var pidSimContent = document.getElementById('scc-pid-sim-content');
+                var pidSimClose = document.getElementById('scc-pid-sim-close');
+                var pidSimBackdrop = document.getElementById('scc-pid-sim-backdrop');
+                var pidSimSlider = document.getElementById('scc-pid-sim-slider');
+                var pidSimSliderValue = document.getElementById('scc-pid-sim-slider-value');
+                function writeSimSurplusW(val, callback) {
+                    var socket = (typeof getSocketFn === 'function' && getSocketFn()) || window.__sccSocket;
+                    var num = Math.round(Number(val)) || 0;
+                    if (typeof setState === 'function') {
+                        try { setState(PID_SIM_STATE_ID, num, true); if (typeof callback === 'function') callback(null); } catch (e) { if (typeof callback === 'function') callback(e); }
+                        return;
+                    }
+                    if (socket && typeof socket.emit === 'function') {
+                        var payload = { val: num, ack: true };
+                        socket.emit('setState', PID_SIM_STATE_ID, payload, function (err) { if (typeof callback === 'function') callback(err || null); });
+                        return;
+                    }
+                    if (typeof callback === 'function') callback(new Error('setState nicht verfügbar'));
+                }
+                function readSimSurplusW(callback) {
+                    var socket = (typeof getSocketFn === 'function' && getSocketFn()) || window.__sccSocket;
+                    if (typeof getStateFn === 'function') {
+                        getStateFn(PID_SIM_STATE_ID, function (err, state) {
+                            var v = state && state.val != null ? Number(state.val) : null;
+                            if (typeof callback === 'function') callback(null, isNaN(v) ? null : v);
+                        });
+                        return;
+                    }
+                    if (socket && (typeof socket.getState === 'function' || typeof socket.emit === 'function')) {
+                        if (typeof socket.getState === 'function') {
+                            socket.getState(PID_SIM_STATE_ID, function (err, state) {
+                                var v = state && state.val != null ? Number(state.val) : null;
+                                if (typeof callback === 'function') callback(null, isNaN(v) ? null : v);
+                            });
+                        } else {
+                            socket.emit('getState', PID_SIM_STATE_ID, function (a, b) {
+                                var state = (b !== undefined ? b : a);
+                                var v = state && state.val != null ? Number(state.val) : null;
+                                if (typeof callback === 'function') callback(null, isNaN(v) ? null : v);
+                            });
+                        }
+                        return;
+                    }
+                    if (typeof callback === 'function') callback(null, null);
+                }
+                function fillPidSimContent(data) {
+                    if (!pidSimContent) return;
+                    if (!data || !data.simulationMode) {
+                        pidSimContent.innerHTML = '<p class="scc-muted">Simulation ist nicht aktiv.</p>';
+                        return;
+                    }
+                    var rlist = (data.rulesList && data.rulesList.length) ? data.rulesList : [];
+                    var pidRules = rlist.filter(function (item) { return item.outputPercent != null || (item.pidDebug); });
+                    if (pidRules.length === 0) {
+                        pidSimContent.innerHTML = '<p class="scc-muted">Keine PID-Regeln konfiguriert oder keine Detailwerte vom Adapter.</p>';
+                        return;
+                    }
+                    var html = '';
+                    for (var i = 0; i < pidRules.length; i++) {
+                        var item = pidRules[i];
+                        var name = (item.name && String(item.name).trim()) || (item.ruleId || 'PID ' + (i + 1));
+                        var d = item.pidDebug;
+                        if (!d) {
+                            html += '<div class="scc-pid-sim-card"><h4 class="scc-pid-sim-card-title">' + escapeHtml(name) + '</h4><p class="scc-muted">Ausgang: ' + (item.outputPercent != null ? item.outputPercent + ' %' : '–') + '.</p></div>';
+                            continue;
+                        }
+                        var unit = d.unit || '';
+                        var ist = d.processVar != null ? (Number(d.processVar).toLocaleString('de-DE', { maximumFractionDigits: 1 }) + ' ' + unit) : '–';
+                        var soll = d.setpoint != null ? (Number(d.setpoint).toLocaleString('de-DE', { maximumFractionDigits: 1 }) + ' ' + unit) : '–';
+                        var fehler = d.error != null ? Number(d.error).toLocaleString('de-DE', { maximumFractionDigits: 2 }) : '–';
+                        var pVal = d.p != null ? Number(d.p).toFixed(2) : '–';
+                        var iVal = d.i != null ? Number(d.i).toFixed(2) : '–';
+                        var outVal = d.output != null ? d.output + ' %' : (item.outputPercent != null ? item.outputPercent + ' %' : '–');
+                        var reason = d.reason ? '<p class="scc-pid-sim-reason">Grund: ' + escapeHtml(d.reason) + '</p>' : '';
+                        html += '<div class="scc-pid-sim-card">' +
+                            '<h4 class="scc-pid-sim-card-title">' + escapeHtml(name) + '</h4>' +
+                            '<table class="scc-pid-sim-table"><tr><td>Ist (Eingang)</td><td>' + escapeHtml(ist) + '</td></tr>' +
+                            '<tr><td>Soll</td><td>' + escapeHtml(soll) + '</td></tr>' +
+                            '<tr><td>Fehler (Soll − Ist)</td><td>' + escapeHtml(String(fehler)) + '</td></tr>' +
+                            '<tr><td>P-Anteil</td><td>' + escapeHtml(String(pVal)) + '</td></tr>' +
+                            '<tr><td>I-Anteil</td><td>' + escapeHtml(String(iVal)) + '</td></tr>' +
+                            '<tr><td>Ausgang</td><td><strong>' + escapeHtml(String(outVal)) + '</strong></td></tr></table>' +
+                            reason + '</div>';
+                    }
+                    pidSimContent.innerHTML = html;
+                }
+                function openPidSimModal() {
+                    var data = window.__sccLastFlowData;
+                    if (!pidSimModal || !pidSimContent) return;
+                    if (!data || !data.simulationMode) {
+                        pidSimContent.innerHTML = '<p class="scc-muted">Simulation ist nicht aktiv. Bitte in den Instanz-Einstellungen „Simulationsmodus“ aktivieren und die Seite aktualisieren.</p>';
+                    } else {
+                        fillPidSimContent(data);
+                    }
+                    pidSimModal.setAttribute('aria-hidden', 'false');
+                    pidSimModal.classList.add('scc-modal--open');
+                    pidSimModal.style.display = '';
+                    readSimSurplusW(function (err, val) {
+                        if (pidSimSlider && val != null && !isNaN(val)) {
+                            var v = Math.max(0, Math.min(2000, Math.round(val)));
+                            pidSimSlider.value = v;
+                            pidSimSlider.setAttribute('aria-valuenow', v);
+                            if (pidSimSliderValue) pidSimSliderValue.textContent = v + ' W';
+                        }
+                    });
+                }
+                window.__sccRefreshPidSimModal = function () {
+                    if (!pidSimModal || !pidSimContent) return;
+                    if (!pidSimModal.classList.contains('scc-modal--open')) return;
+                    var data = window.__sccLastFlowData;
+                    if (data) fillPidSimContent(data);
+                };
+                function closePidSimModal() {
+                    if (pidSimModal) {
+                        pidSimModal.setAttribute('aria-hidden', 'true');
+                        pidSimModal.classList.remove('scc-modal--open');
+                        pidSimModal.style.display = 'none';
+                    }
+                }
+                if (pidSimSlider) {
+                    function updateSliderDisplay() {
+                        var v = parseInt(pidSimSlider.value, 10) || 0;
+                        if (pidSimSliderValue) pidSimSliderValue.textContent = v + ' W';
+                        pidSimSlider.setAttribute('aria-valuenow', v);
+                        writeSimSurplusW(v, function () {});
+                    }
+                    pidSimSlider.addEventListener('input', updateSliderDisplay);
+                    pidSimSlider.addEventListener('change', updateSliderDisplay);
+                }
+                if (pidSimBtn) pidSimBtn.addEventListener('click', openPidSimModal);
+                if (pidSimClose) pidSimClose.addEventListener('click', closePidSimModal);
+                if (pidSimBackdrop) pidSimBackdrop.addEventListener('click', closePidSimModal);
+            })();
+
+            (function () {
+                var modalEl = document.getElementById('scc-rules-modal');
+                var contentEl = document.getElementById('scc-rules-modal-content');
+                var formWrap = document.getElementById('scc-rules-form-wrap');
+                var formOnoff = document.getElementById('scc-rules-form-onoff');
+                var formPid = document.getElementById('scc-rules-form-pid');
+                var closeBtn = document.getElementById('scc-rules-modal-close');
+                var backdropEl = document.getElementById('scc-rules-modal-backdrop');
+                var openBtn = document.getElementById('scc-open-rules');
+                var currentRulesOnOff = [];
+                var currentRulesPid = [];
+                var formMode = null;
+                var formEditIndex = -1;
+
+                function closeRulesModal() {
+                    if (modalEl) {
+                        modalEl.setAttribute('aria-hidden', 'true');
+                        modalEl.classList.remove('scc-modal--open');
+                    }
+                    hideForm();
+                }
+                function hideForm() {
+                    formMode = null;
+                    formEditIndex = -1;
+                    if (formWrap) formWrap.style.display = 'none';
+                    if (formOnoff) formOnoff.style.display = 'none';
+                    if (formPid) formPid.style.display = 'none';
+                }
+                function showForm(type, editIndex) {
+                    formMode = type;
+                    formEditIndex = editIndex >= 0 ? editIndex : -1;
+                    if (formWrap) formWrap.style.display = 'block';
+                    if (type === 'onoff') {
+                        if (formOnoff) formOnoff.style.display = 'block';
+                        if (formPid) formPid.style.display = 'none';
+                        if (formEditIndex >= 0 && currentRulesOnOff[formEditIndex]) setFormOnoff(currentRulesOnOff[formEditIndex]);
+                        else setFormOnoff({});
+                    } else {
+                        if (formOnoff) formOnoff.style.display = 'none';
+                        if (formPid) formPid.style.display = 'block';
+                        if (formEditIndex >= 0 && currentRulesPid[formEditIndex]) setFormPid(currentRulesPid[formEditIndex]);
+                        else setFormPid({});
+                    }
+                }
+                function numVal(v, def) { var n = Number(v); return (v !== '' && v != null && !isNaN(n)) ? n : def; }
+                function getFormOnoff() {
+                    return {
+                        targetStateId: (document.getElementById('scc-f-targetStateId') && document.getElementById('scc-f-targetStateId').value) ? String(document.getElementById('scc-f-targetStateId').value).trim() : '',
+                        name: document.getElementById('scc-f-name') ? String(document.getElementById('scc-f-name').value || '').trim() : '',
+                        devicePowerW: numVal(document.getElementById('scc-f-devicePowerW') && document.getElementById('scc-f-devicePowerW').value, 0),
+                        thresholdOn: numVal(document.getElementById('scc-f-thresholdOn') && document.getElementById('scc-f-thresholdOn').value, 200),
+                        thresholdOff: numVal(document.getElementById('scc-f-thresholdOff') && document.getElementById('scc-f-thresholdOff').value, 100),
+                        minOnSec: numVal(document.getElementById('scc-f-minOnSec') && document.getElementById('scc-f-minOnSec').value, 0),
+                        minOffSec: numVal(document.getElementById('scc-f-minOffSec') && document.getElementById('scc-f-minOffSec').value, 0),
+                        delayOnSec: numVal(document.getElementById('scc-f-delayOnSec') && document.getElementById('scc-f-delayOnSec').value, 0),
+                        delayOffSec: numVal(document.getElementById('scc-f-delayOffSec') && document.getElementById('scc-f-delayOffSec').value, 0),
+                        priority: numVal(document.getElementById('scc-f-priority') && document.getElementById('scc-f-priority').value, 0),
+                        enabled: document.getElementById('scc-f-enabled') ? document.getElementById('scc-f-enabled').checked : true
+                    };
+                }
+                function setFormOnoff(r) {
+                    var set = function (id, v) { var el = document.getElementById(id); if (el) el.value = v != null ? v : ''; };
+                    var setC = function (id, v) { var el = document.getElementById(id); if (el) el.checked = v !== false; };
+                    set('scc-f-targetStateId', r.targetStateId);
+                    set('scc-f-name', r.name);
+                    set('scc-f-devicePowerW', r.devicePowerW != null ? r.devicePowerW : 0);
+                    set('scc-f-thresholdOn', r.thresholdOn != null ? r.thresholdOn : 200);
+                    set('scc-f-thresholdOff', r.thresholdOff != null ? r.thresholdOff : 100);
+                    set('scc-f-minOnSec', r.minOnSec != null ? r.minOnSec : 0);
+                    set('scc-f-minOffSec', r.minOffSec != null ? r.minOffSec : 0);
+                    set('scc-f-delayOnSec', r.delayOnSec != null ? r.delayOnSec : 0);
+                    set('scc-f-delayOffSec', r.delayOffSec != null ? r.delayOffSec : 0);
+                    set('scc-f-priority', r.priority != null ? r.priority : 0);
+                    setC('scc-f-enabled', r.enabled !== false);
+                }
+                function getFormPid() {
+                    return {
+                        targetStateId: (document.getElementById('scc-f-pid-targetStateId') && document.getElementById('scc-f-pid-targetStateId').value) ? String(document.getElementById('scc-f-pid-targetStateId').value).trim() : '',
+                        name: document.getElementById('scc-f-pid-name') ? String(document.getElementById('scc-f-pid-name').value || '').trim() : '',
+                        pidInputSource: (document.getElementById('scc-f-pidInputSource') && document.getElementById('scc-f-pidInputSource').value) || 'surplus',
+                        pidInputStateId: document.getElementById('scc-f-pidInputStateId') ? String(document.getElementById('scc-f-pidInputStateId').value || '').trim() : '',
+                        pidSetpointW: numVal(document.getElementById('scc-f-pidSetpointW') && document.getElementById('scc-f-pidSetpointW').value, 250),
+                        pidSetpointTemp: numVal(document.getElementById('scc-f-pidSetpointTemp') && document.getElementById('scc-f-pidSetpointTemp').value, 50),
+                        pidThresholdOnW: numVal(document.getElementById('scc-f-pidThresholdOnW') && document.getElementById('scc-f-pidThresholdOnW').value, 0),
+                        pidThresholdOffW: numVal(document.getElementById('scc-f-pidThresholdOffW') && document.getElementById('scc-f-pidThresholdOffW').value, 0),
+                        tempLimitStateId: document.getElementById('scc-f-tempLimitStateId') ? String(document.getElementById('scc-f-tempLimitStateId').value || '').trim() : '',
+                        tempLimitMax: (function () { var v = document.getElementById('scc-f-tempLimitMax') && document.getElementById('scc-f-tempLimitMax').value; return (v === '' || v === null) ? null : numVal(v, null); })(),
+                        pidXp: numVal(document.getElementById('scc-f-pidXp') && document.getElementById('scc-f-pidXp').value, 20000),
+                        pidTn: numVal(document.getElementById('scc-f-pidTn') && document.getElementById('scc-f-pidTn').value, 9),
+                        priority: numVal(document.getElementById('scc-f-pid-priority') && document.getElementById('scc-f-pid-priority').value, 0),
+                        enabled: document.getElementById('scc-f-pid-enabled') ? document.getElementById('scc-f-pid-enabled').checked : true
+                    };
+                }
+                function setFormPid(p) {
+                    var set = function (id, v) { var el = document.getElementById(id); if (el) el.value = v != null ? v : ''; };
+                    var setC = function (id, v) { var el = document.getElementById(id); if (el) el.checked = v !== false; };
+                    set('scc-f-pid-targetStateId', p.targetStateId);
+                    set('scc-f-pid-name', p.name);
+                    set('scc-f-pidInputSource', p.pidInputSource || 'surplus');
+                    set('scc-f-pidInputStateId', p.pidInputStateId || '');
+                    set('scc-f-pidSetpointW', p.pidSetpointW != null ? p.pidSetpointW : 250);
+                    set('scc-f-pidSetpointTemp', p.pidSetpointTemp != null ? p.pidSetpointTemp : 50);
+                    set('scc-f-pidThresholdOnW', p.pidThresholdOnW != null ? p.pidThresholdOnW : 0);
+                    set('scc-f-pidThresholdOffW', p.pidThresholdOffW != null ? p.pidThresholdOffW : 0);
+                    set('scc-f-tempLimitStateId', p.tempLimitStateId || '');
+                    set('scc-f-tempLimitMax', p.tempLimitMax != null ? p.tempLimitMax : '');
+                    set('scc-f-pidXp', p.pidXp != null ? p.pidXp : 20000);
+                    set('scc-f-pidTn', p.pidTn != null ? p.pidTn : 9);
+                    set('scc-f-pid-priority', p.priority != null ? p.priority : 0);
+                    setC('scc-f-pid-enabled', p.enabled !== false);
+                }
+                function stripForNative(r) {
+                    var o = {};
+                    for (var k in r) if (k !== 'ruleType' && r.hasOwnProperty(k)) o[k] = r[k];
+                    return o;
+                }
+                function saveConfig(cb) {
+                    var onOff = currentRulesOnOff.map(stripForNative);
+                    var pid = currentRulesPid.map(stripForNative);
+                    var fn = typeof sendTo === 'function' ? sendTo : (window.parent && window.parent.sendTo) || (window.opener && window.opener.sendTo);
+                    if (typeof fn === 'function') {
+                        fn(instanceId, 'setConfig', { rulesOnOff: onOff, rulesPid: pid }, function (err) {
+                            if (typeof cb === 'function') cb(err);
+                        });
+                        return;
+                    }
+                    var socket = (typeof getSocketFn === 'function' && getSocketFn()) || window.__sccSocket;
+                    if (socket && typeof socket.emit === 'function') {
+                        var id = 'system.adapter.' + instanceId;
+                        socket.emit('getObject', id, function (err, obj) {
+                            if (err || !obj) {
+                                if (typeof cb === 'function') cb(err || new Error('Adapter-Objekt nicht lesbar'));
+                                return;
+                            }
+                            var native = obj.native || {};
+                            native.rulesOnOff = onOff;
+                            native.rulesPid = pid;
+                            var updated = Object.assign({}, obj, { native: native });
+                            socket.emit('setObject', id, updated, function (errSet) {
+                                if (typeof cb === 'function') cb(errSet || null);
+                            });
+                        });
+                        return;
+                    }
+                    if (typeof cb === 'function') cb(new Error('Speichern nicht möglich: weder sendTo noch Socket verfügbar. Bitte den Flow-Tab im ioBroker-Admin öffnen.'));
+                }
+                function renderRulesContent() {
+                    if (!contentEl) return;
+                    var onOff = currentRulesOnOff;
+                    var pid = currentRulesPid;
+                    var html = '';
+                    html += '<section class="scc-rules-section">';
+                    html += '<div class="scc-rules-section-head"><h3>EIN/AUS (Schwellwert)</h3><button type="button" class="scc-btn scc-btn-sm" data-action="add-onoff">+ Neue Regel</button></div>';
+                    if (onOff.length === 0) {
+                        html += '<p class="scc-muted">Keine EIN/AUS-Regeln.</p>';
+                    } else {
+                        html += '<ul class="scc-rules-list">';
+                        for (var i = 0; i < onOff.length; i++) {
+                            var r = onOff[i];
+                            var name = (r.name && String(r.name).trim()) || (r.targetStateId ? String(r.targetStateId).split('.').pop() : 'Regel ' + (i + 1));
+                            var thOn = r.thresholdOn != null ? Math.round(Number(r.thresholdOn)) + ' W' : '–';
+                            var thOff = r.thresholdOff != null ? Math.round(Number(r.thresholdOff)) + ' W' : '–';
+                            var active = r.enabled !== false ? 'Aktiv' : 'Inaktiv';
+                            html += '<li class="scc-rule-card"><div class="scc-rule-card-main"><span class="scc-rule-name">' + escapeHtml(name) + '</span> <span class="scc-muted">EIN ab ' + escapeHtml(String(thOn)) + ', AUS unter ' + escapeHtml(String(thOff)) + ' · ' + active + '</span></div><div class="scc-rule-card-actions"><button type="button" class="scc-btn-link" data-action="edit-onoff" data-index="' + i + '">Bearbeiten</button><button type="button" class="scc-btn-link scc-btn-link-danger" data-action="delete-onoff" data-index="' + i + '">Löschen</button></div></li>';
+                        }
+                        html += '</ul>';
+                    }
+                    html += '</section>';
+                    html += '<section class="scc-rules-section">';
+                    html += '<div class="scc-rules-section-head"><h3>PID (0–100 %)</h3><button type="button" class="scc-btn scc-btn-sm" data-action="add-pid">+ Neue Regel</button></div>';
+                    if (pid.length === 0) {
+                        html += '<p class="scc-muted">Keine PID-Regeln.</p>';
+                    } else {
+                        html += '<ul class="scc-rules-list">';
+                        for (var j = 0; j < pid.length; j++) {
+                            var p = pid[j];
+                            var pname = (p.name && String(p.name).trim()) || (p.targetStateId ? String(p.targetStateId).split('.').pop() : 'PID ' + (j + 1));
+                            var inp = p.pidInputSource === 'temperature' ? 'Temperatur' : (p.pidInputSource === 'state' ? 'Datenpunkt' : 'Überschuss');
+                            var setpt = p.pidSetpointW != null ? Math.round(Number(p.pidSetpointW)) + ' W' : (p.pidSetpointTemp != null ? Math.round(Number(p.pidSetpointTemp)) + ' °C' : '–');
+                            var pactive = p.enabled !== false ? 'Aktiv' : 'Inaktiv';
+                            html += '<li class="scc-rule-card"><div class="scc-rule-card-main"><span class="scc-rule-name">' + escapeHtml(pname) + '</span> <span class="scc-muted">' + escapeHtml(inp) + ', Soll ' + escapeHtml(String(setpt)) + ' · ' + pactive + '</span></div><div class="scc-rule-card-actions"><button type="button" class="scc-btn-link" data-action="edit-pid" data-index="' + j + '">Bearbeiten</button><button type="button" class="scc-btn-link scc-btn-link-danger" data-action="delete-pid" data-index="' + j + '">Löschen</button></div></li>';
+                        }
+                        html += '</ul>';
+                    }
+                    html += '</section>';
+                    contentEl.innerHTML = html;
+                }
+                function openRulesModal() {
+                    if (!contentEl || !modalEl) return;
+                    contentEl.innerHTML = '<p class="scc-muted">Lade Regeln …</p>';
+                    if (formWrap) formWrap.style.display = 'none';
+                    modalEl.setAttribute('aria-hidden', 'false');
+                    modalEl.classList.add('scc-modal--open');
+
+                    var done = false;
+                    function finish(data) {
+                        if (done) return;
+                        done = true;
+                        if (!data || !data.rulesOnOff || !data.rulesPid) {
+                            contentEl.innerHTML = '<p class="scc-muted">Regeln konnten nicht geladen werden.</p>';
+                            return;
+                        }
+                        currentRulesOnOff = Array.isArray(data.rulesOnOff) ? data.rulesOnOff.slice() : [];
+                        currentRulesPid = Array.isArray(data.rulesPid) ? data.rulesPid.slice() : [];
+                        renderRulesContent();
+                    }
+                    function trySendTo() {
+                        var fn = typeof sendTo === 'function' ? sendTo : (window.parent && window.parent.sendTo) || (window.opener && window.opener.sendTo);
+                        if (typeof fn !== 'function') return false;
+                        fn(instanceId, 'getConfig', {}, function (err, data) {
+                            if (err || !data) { finish(null); return; }
+                            finish(data);
+                        });
+                        return true;
+                    }
+                    function tryGetObject() {
+                        var socket = (typeof getSocketFn === 'function' && getSocketFn()) || window.__sccSocket;
+                        if (!socket) return false;
+                        var id = 'system.adapter.' + instanceId;
+                        if (typeof socket.getObject === 'function') {
+                            socket.getObject(id, function (err, obj) {
+                                if (err || !obj || !obj.native) { finish(null); return; }
+                                var n = obj.native;
+                                finish({ rulesOnOff: Array.isArray(n.rulesOnOff) ? n.rulesOnOff : [], rulesPid: Array.isArray(n.rulesPid) ? n.rulesPid : [] });
+                            });
+                            return true;
+                        }
+                        if (typeof socket.emit === 'function') {
+                            socket.emit('getObject', id, function (err, obj) {
+                                if (err || !obj || !obj.native) { finish(null); return; }
+                                var n = obj.native;
+                                finish({ rulesOnOff: Array.isArray(n.rulesOnOff) ? n.rulesOnOff : [], rulesPid: Array.isArray(n.rulesPid) ? n.rulesPid : [] });
+                            });
+                            return true;
+                        }
+                        return false;
+                    }
+                    if (trySendTo()) return;
+                    if (tryGetObject()) return;
+                    setTimeout(function () {
+                        if (done) return;
+                        done = true;
+                        contentEl.innerHTML = '<p class="scc-muted">Regeln können nur geladen werden, wenn diese Seite im ioBroker-Admin geöffnet ist (Flow-Tab der SCC-Instanz).</p>';
+                    }, 500);
+                }
+                contentEl.addEventListener('click', function (e) {
+                    var btn = e.target && e.target.closest && e.target.closest('[data-action]');
+                    if (!btn || !btn.getAttribute) return;
+                    var action = btn.getAttribute('data-action');
+                    var idx = parseInt(btn.getAttribute('data-index'), 10);
+                    if (action === 'add-onoff') { showForm('onoff', -1); return; }
+                    if (action === 'add-pid') { showForm('pid', -1); return; }
+                    if (action === 'edit-onoff' && !isNaN(idx)) { showForm('onoff', idx); return; }
+                    if (action === 'edit-pid' && !isNaN(idx)) { showForm('pid', idx); return; }
+                    if (action === 'delete-onoff' && !isNaN(idx)) {
+                        if (!confirm('EIN/AUS-Regel wirklich löschen?')) return;
+                        currentRulesOnOff.splice(idx, 1);
+                        saveConfig(function (err) {
+                            if (err) alert('Speichern fehlgeschlagen: ' + (err.message || err));
+                            else renderRulesContent();
+                        });
+                        return;
+                    }
+                    if (action === 'delete-pid' && !isNaN(idx)) {
+                        if (!confirm('PID-Regel wirklich löschen?')) return;
+                        currentRulesPid.splice(idx, 1);
+                        saveConfig(function (err) {
+                            if (err) alert('Speichern fehlgeschlagen: ' + (err.message || err));
+                            else renderRulesContent();
+                        });
+                        return;
+                    }
+                });
+                var formSaveEl = document.getElementById('scc-rules-form-save');
+                if (formSaveEl) formSaveEl.addEventListener('click', function () {
+                    if (formMode === 'onoff') {
+                        var o = getFormOnoff();
+                        if (!o.targetStateId) { alert('Bitte Ziel (State-ID) angeben.'); return; }
+                        if (formEditIndex >= 0) currentRulesOnOff[formEditIndex] = o;
+                        else currentRulesOnOff.push(o);
+                    } else if (formMode === 'pid') {
+                        var p = getFormPid();
+                        if (!p.targetStateId) { alert('Bitte Ausgang (State-ID) angeben.'); return; }
+                        if (formEditIndex >= 0) currentRulesPid[formEditIndex] = p;
+                        else currentRulesPid.push(p);
+                    }
+                    saveConfig(function (err) {
+                        if (err) {
+                            alert('Speichern fehlgeschlagen: ' + (err.message || err));
+                            return;
+                        }
+                        hideForm();
+                        renderRulesContent();
+                    });
+                });
+                var formCancelEl = document.getElementById('scc-rules-form-cancel');
+                if (formCancelEl) formCancelEl.addEventListener('click', hideForm);
+                if (closeBtn) closeBtn.addEventListener('click', closeRulesModal);
+                if (backdropEl) backdropEl.addEventListener('click', closeRulesModal);
+                if (openBtn) openBtn.addEventListener('click', openRulesModal);
+
+                (function () {
+                    var pickerModal = document.getElementById('scc-state-picker-modal');
+                    var pickerList = document.getElementById('scc-state-picker-list');
+                    var pickerFilter = document.getElementById('scc-state-picker-filter');
+                    var pickerStatus = document.getElementById('scc-state-picker-status');
+                    var pickerBackdrop = document.getElementById('scc-state-picker-backdrop');
+                    var pickerCloseBtn = document.getElementById('scc-state-picker-close');
+                    var pickerTargetInputId = null;
+                    var pickerAllIds = [];
+                    var rulesModalEl = document.getElementById('scc-rules-modal');
+                    var formWrapEl = document.getElementById('scc-rules-form-wrap');
+
+                    function findPickerBtn(el) {
+                        if (!el || !el.classList) return null;
+                        if (el.classList.contains('scc-picker-btn')) return el;
+                        return findPickerBtn(el.parentElement);
+                    }
+                    function onPickerButtonClick(e) {
+                        var btn = findPickerBtn(e.target);
+                        if (!btn) return;
+                        var target = btn.getAttribute('data-target');
+                        if (!target) return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (pickerModal) {
+                            pickerModal.style.display = 'flex';
+                            pickerModal.classList.add('scc-picker-open');
+                            pickerModal.setAttribute('aria-hidden', 'false');
+                            pickerTargetInputId = target;
+                            if (pickerFilter) pickerFilter.value = '';
+                            if (pickerStatus) pickerStatus.textContent = 'Lade …';
+                            if (pickerList) pickerList.innerHTML = '';
+                            pickerAllIds = [];
+                            var socket = (typeof getSocketFn === 'function' && getSocketFn()) || window.__sccSocket;
+                            function loadObjectsViaGetObjects(cb) {
+                                if (!socket || typeof socket.emit !== 'function') return cb(null, []);
+                                socket.emit('getObjects', function (err, objs) {
+                                    if (err || !objs) return cb(err, []);
+                                    var ids = Object.keys(objs).filter(function (k) {
+                                        var o = objs[k];
+                                        return o && (o.type === 'state' || (o.common && (o.common.type === 'state' || o.common.type === 'number' || o.common.type === 'boolean')));
+                                    });
+                                    cb(null, ids.sort());
+                                });
+                            }
+                            if (socket && (typeof socket.getObjectView === 'function' || typeof socket.emit === 'function')) {
+                                var done = false;
+                                function onViewResult(err, result) {
+                                    if (done) return;
+                                    if (arguments.length === 1) { result = err; err = null; }
+                                    var ids = [];
+                                    if (!err && result && result.rows && Array.isArray(result.rows)) {
+                                        result.rows.forEach(function (row) {
+                                            var id = row.id || row.key || (row.value && row.value.id);
+                                            if (id) ids.push(id);
+                                        });
+                                    }
+                                    if (ids.length > 0) {
+                                        done = true;
+                                        showList(ids.sort());
+                                        return;
+                                    }
+                                    loadObjectsViaGetObjects(function (e, fallbackIds) {
+                                        if (done) return;
+                                        done = true;
+                                        if (e || !fallbackIds.length) {
+                                            if (pickerStatus) pickerStatus.textContent = 'Laden fehlgeschlagen oder keine Datenpunkte.';
+                                            return;
+                                        }
+                                        showList(fallbackIds);
+                                    });
+                                }
+                                if (typeof socket.getObjectView === 'function') {
+                                    socket.getObjectView('system', 'state', { startkey: '', endkey: '\u9999' }, onViewResult);
+                                } else {
+                                    socket.emit('getObjectView', 'system', 'state', { startkey: '', endkey: '\u9999' }, onViewResult);
+                                }
+                                setTimeout(function () {
+                                    if (!done && pickerStatus) pickerStatus.textContent = 'Lade Objektbaum …';
+                                }, 500);
+                            } else if (socket && typeof socket.emit === 'function') {
+                                loadObjectsViaGetObjects(function (err, ids) {
+                                    if (err || !ids.length) {
+                                        if (pickerStatus) pickerStatus.textContent = err ? 'Laden fehlgeschlagen.' : 'Keine Datenpunkte gefunden.';
+                                        return;
+                                    }
+                                    showList(ids);
+                                });
+                            } else {
+                                if (pickerStatus) pickerStatus.textContent = 'Keine Verbindung zum Admin. Bitte im Admin öffnen.';
+                            }
+                        }
+                    }
+                    if (formWrapEl) formWrapEl.addEventListener('click', onPickerButtonClick);
+                    if (rulesModalEl) rulesModalEl.addEventListener('click', onPickerButtonClick);
+                    document.querySelectorAll('.scc-picker-btn').forEach(function (btn) {
+                        btn.addEventListener('click', function (e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            var target = btn.getAttribute('data-target');
+                            if (target) {
+                                var fakeEv = { target: btn, preventDefault: function () {}, stopPropagation: function () {} };
+                                onPickerButtonClick(fakeEv);
+                            }
+                        });
+                    });
+
+                    function closePicker() {
+                        pickerTargetInputId = null;
+                        if (pickerModal) {
+                            pickerModal.style.display = 'none';
+                            pickerModal.classList.remove('scc-picker-open');
+                            pickerModal.setAttribute('aria-hidden', 'true');
+                        }
+                    }
+                    function buildTree(ids) {
+                        var root = { name: '', children: {}, fullId: null };
+                        (ids || []).forEach(function (id) {
+                            var parts = String(id).split('.');
+                            if (parts.length < 2) return;
+                            var cur = root;
+                            for (var i = 0; i < parts.length; i++) {
+                                var key = parts[i];
+                                var isLeaf = (i === parts.length - 1);
+                                if (!cur.children[key]) {
+                                    cur.children[key] = { name: key, children: {}, fullId: isLeaf ? id : null };
+                                }
+                                cur = cur.children[key];
+                                if (isLeaf) cur.fullId = id;
+                            }
+                        });
+                        return root;
+                    }
+                    function renderPickerTree(list) {
+                        if (!pickerList) return;
+                        pickerList.innerHTML = '';
+                        if (list.length === 0) {
+                            pickerList.innerHTML = '<p class="scc-muted">Keine Datenpunkte gefunden.</p>';
+                            if (pickerStatus) pickerStatus.textContent = pickerAllIds.length + ' Datenpunkte geladen.';
+                            return;
+                        }
+                        var tree = buildTree(list);
+                        function renderNode(node, depth, parentEl) {
+                            var keys = Object.keys(node.children || {}).sort();
+                            keys.forEach(function (key) {
+                                var child = node.children[key];
+                                var hasChildren = child.children && Object.keys(child.children).length > 0;
+                                var row = document.createElement('div');
+                                row.className = 'scc-picker-tree-row' + (child.fullId ? ' scc-picker-leaf' : ' scc-picker-folder');
+                                row.style.paddingLeft = (depth * 14 + 4) + 'px';
+                                var toggle = document.createElement('span');
+                                toggle.className = 'scc-picker-toggle';
+                                toggle.textContent = hasChildren ? '\u25b6' : (child.fullId ? '' : '\u25b6');
+                                toggle.style.visibility = hasChildren ? 'visible' : 'hidden';
+                                row.appendChild(toggle);
+                                var icon = document.createElement('span');
+                                icon.className = 'scc-picker-icon';
+                                icon.textContent = child.fullId && !hasChildren ? '\u25a2' : '\u2302';
+                                row.appendChild(icon);
+                                var label = document.createElement('span');
+                                label.className = 'scc-picker-label';
+                                label.textContent = key;
+                                row.appendChild(label);
+                                if (child.fullId) {
+                                    row.setAttribute('data-id', child.fullId);
+                                    row.tabIndex = 0;
+                                    row.addEventListener('click', function (e) {
+                                        if (e.target.classList && (e.target.classList.contains('scc-picker-toggle') || e.target.classList.contains('scc-picker-icon'))) return;
+                                        var el = document.getElementById(pickerTargetInputId);
+                                        if (el) el.value = child.fullId;
+                                        closePicker();
+                                    });
+                                } else {
+                                    row.classList.add('scc-picker-folder-closed');
+                                    row.addEventListener('click', function (e) {
+                                        if (e.target.classList && e.target.classList.contains('scc-picker-label')) return;
+                                        var content = row.nextElementSibling;
+                                        if (content && content.classList.contains('scc-picker-tree-children')) {
+                                            content.style.display = content.style.display === 'none' ? '' : 'none';
+                                            row.classList.toggle('scc-picker-folder-closed', content.style.display === 'none');
+                                            toggle.textContent = content.style.display === 'none' ? '\u25b6' : '\u25bc';
+                                        }
+                                    });
+                                }
+                                parentEl.appendChild(row);
+                                if (hasChildren) {
+                                    var wrap = document.createElement('div');
+                                    wrap.className = 'scc-picker-tree-children';
+                                    wrap.style.display = 'none';
+                                    parentEl.appendChild(wrap);
+                                    renderNode(child, depth + 1, wrap);
+                                }
+                            });
+                        }
+                        var container = document.createElement('div');
+                        container.className = 'scc-picker-tree';
+                        renderNode(tree, 0, container);
+                        pickerList.appendChild(container);
+                        if (pickerStatus) pickerStatus.textContent = list.length + ' Datenpunkte' + (pickerAllIds.length && list.length < pickerAllIds.length ? ' (gefiltert von ' + pickerAllIds.length + ')' : '') + '.';
+                    }
+                    function filterPickerList() {
+                        var q = (pickerFilter && pickerFilter.value) ? String(pickerFilter.value).toLowerCase().trim() : '';
+                        var list = q ? pickerAllIds.filter(function (id) { return id.toLowerCase().indexOf(q) >= 0; }) : pickerAllIds;
+                        renderPickerTree(list);
+                    }
+                    function showList(ids) {
+                        pickerAllIds = ids || [];
+                        filterPickerList();
+                    }
+                    if (pickerFilter) {
+                        pickerFilter.addEventListener('input', function () {
+                            if (pickerAllIds.length && pickerList) filterPickerList();
+                        });
+                        pickerFilter.addEventListener('keydown', function (e) {
+                            if (e.key === 'Escape') closePicker();
+                        });
+                    }
+                    if (pickerBackdrop) pickerBackdrop.addEventListener('click', closePicker);
+                    if (pickerCloseBtn) pickerCloseBtn.addEventListener('click', closePicker);
+                })();
+            })();
 
             window.__sccFlowStart = function () {
                 sccLog('__sccFlowStart', window.__sccSocket ? 'Socket da' : 'kein Socket');
