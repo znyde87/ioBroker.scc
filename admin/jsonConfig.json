@@ -11,6 +11,10 @@
           "min": 0,
           "max": 100000,
           "sm": 6,
+          "xs": 12,
+          "md": 6,
+          "lg": 6,
+          "xl": 6,
           "help": { "de": "Ab diesem Brutto-Überschuss gilt „Überschuss aktiv“.", "en": "Above this gross surplus, \"surplus active\" applies." }
         },
         "batteryReserveW": {
@@ -19,6 +23,10 @@
           "min": 0,
           "max": 50000,
           "sm": 6,
+          "xs": 12,
+          "md": 6,
+          "lg": 6,
+          "xl": 6,
           "newLine": true,
           "help": { "de": "Fixe Reservierung für Ladung, wenn keine Ladeleistung-States genutzt werden.", "en": "Fixed reserve for charging when no charge power states are used." }
         },
@@ -26,6 +34,10 @@
           "type": "checkbox",
           "label": { "de": "Ladeleistung aus States nutzen", "en": "Use charge power from states" },
           "sm": 6,
+          "xs": 12,
+          "md": 6,
+          "lg": 6,
+          "xl": 6,
           "newLine": true,
           "help": { "de": "Wenn aktiv: Ladeleistung pro Batterie aus States abziehen. Sonst: nur batteryReserveW.", "en": "If enabled: subtract charge power per battery from states. Otherwise: only batteryReserveW." }
         },
@@ -33,6 +45,10 @@
           "type": "select",
           "label": { "de": "Überschuss-Priorität", "en": "Surplus priority" },
           "sm": 6,
+          "xs": 12,
+          "md": 6,
+          "lg": 6,
+          "xl": 6,
           "newLine": true,
           "options": [
             { "value": "battery_first", "label": { "de": "Batterie zuerst, dann Geräte, Rest ins Netz", "en": "Battery first, then devices, rest to grid" } },
@@ -44,6 +60,10 @@
           "type": "checkbox",
           "label": { "de": "Überschussgeräte nur mit echtem Überschuss", "en": "Surplus devices only with real surplus" },
           "sm": 6,
+          "xs": 12,
+          "md": 6,
+          "lg": 6,
+          "xl": 6,
           "newLine": true,
           "help": { "de": "Wenn aktiv: Geräte nur bei echtem PV-Überschuss (nach Batterie/Netz), nicht wenn die Batterie entlädt. Entladeleistung zählt dann nicht als „für Verbraucher verfügbar“.", "en": "If enabled: devices only when there is real PV surplus (after battery/grid), not when battery is discharging." }
         },

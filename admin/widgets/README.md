@@ -1,30 +1,30 @@
 # SCC VIS/Material Widgets
 
-## Energiefluss-Widget
+## Energy flow widget
 
-Die Datei `scc-flow-widget.html` enthält ein kompaktes Energiefluss-Widget für **VIS** oder **Material**.
+The file `scc-flow-widget.html` contains a compact energy flow widget for **VIS** or **Material**.
 
-### Nutzung in VIS
+### Using in VIS
 
-1. In VIS eine neue View erstellen oder bestehende öffnen.
-2. **Widget hinzufügen** → **HTML** (oder "HTML-Widget").
-3. Den Inhalt von `scc-flow-widget.html` einfügen.
-4. OID auf `scc.0.flowData` setzen (falls das HTML-Widget OID unterstützt).
-5. Bei anderer Instanz: `scc.0` durch `scc.X` ersetzen (X = Instanznummer).
+1. Create a new view in VIS or open an existing one.
+2. **Add widget** → **HTML** (or "HTML widget").
+3. Paste the content of `scc-flow-widget.html`.
+4. Set OID to `scc.0.flowData` (if the HTML widget supports OID).
+5. For a different instance: replace `scc.0` with `scc.X` (X = instance number).
 
-### Nutzung in Material
+### Using in Material
 
-1. Material-Adapter installieren.
-2. Eine neue Karte mit HTML-Inhalt erstellen.
-3. Den Inhalt von `scc-flow-widget.html` einfügen.
-4. Datenpunkt `scc.0.flowData` anbinden (falls Material HTML-Karten OID unterstützen).
+1. Install the Material adapter.
+2. Create a new card with HTML content.
+3. Paste the content of `scc-flow-widget.html`.
+4. Bind data point `scc.0.flowData` (if Material HTML cards support OID).
 
-### Alternative: Flow-Tab als iframe
+### Alternative: Flow tab as iframe
 
-Der Admin-Tab **Flow** (`/adapter/scc/flow.html`) kann in VIS als iframe eingebettet werden:
+The Admin **Flow** tab (`/adapter/scc/flow.html`) can be embedded in VIS as an iframe:
 
 ```html
 <iframe src="/adapter/scc/flow.html?instance=0" style="width:100%;height:400px;border:0;"></iframe>
 ```
 
-(Instance-Parameter anpassen bei anderer Instanznummer.)
+(Adjust the instance parameter for a different instance number.)

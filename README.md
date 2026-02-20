@@ -1,105 +1,111 @@
 # ioBroker SCC (Self-Consumption Charging)
 
-**Deutsch** | [English](README.en.md)
+**English** | [Deutsch](doc/de/README.md)
 
 [![Downloads](https://img.shields.io/npm/dm/iobroker.scc.svg)](https://www.npmjs.com/package/iobroker.scc)
 [![Installed](https://iobroker.live/badges/scc-installed.svg)](https://iobroker.live/badges/scc-installed)
 
-**SCC** steht für **Self-Consumption Charging**: Eigenverbrauch steuern – zuerst Batterien laden, dann Geräte mit PV-Überschuss schalten, Rest ins Netz.
+**SCC** stands for **Self-Consumption Charging**: control self-consumption – charge batteries first, then switch devices with PV surplus, rest to grid.
 
-**Hinweis:** Dieser Adapter befindet sich in **Entwicklung**. Es wird **keine Haftung** für die Funktionsfähigkeit, Schäden oder Folgen der Nutzung übernommen. Nutzung auf eigenes Risiko.
+**Note:** This adapter is **in development**. **No liability** is assumed for functionality, damage or consequences of use. Use at your own risk.
 
 ---
 
-## Beschreibung
+## Description
 
-Dieser ioBroker-Adapter berechnet den **PV-Überschuss** aus konfigurierbaren Quellen (z. B. Shelly Pro 3 EM, Wechselrichter, Zähler), bindet **Batterien** (SoC, Lade-/Entladeleistung) ein und schaltet **Geräte/Steckdosen** abhängig vom nach Batterie-Ladung verbleibenden Überschuss. Die Priorität ist konfigurierbar: **Batterie zuerst** (Standard) oder **Geräte zuerst**.
+This ioBroker adapter calculates **PV surplus** from configurable sources (e.g. Shelly Pro 3 EM, inverter, meter), integrates **batteries** (SoC, charge/discharge power), and switches **devices/sockets** depending on surplus remaining after battery charging. Priority is configurable: **Battery first** (default) or **Devices first**.
 
-### Kernfunktionen
+### Core features
 
-- **Quellen:** Mehrere Quellen mit Typen Erzeugung, Verbrauch, Netzleistung, Einspeisung – flexibel kombinierbar (z. B. Shelly am Hausanschluss als Netzleistung).
-- **Batterien:** Mehrere Speicher mit SoC, optional Lade-/Entladeleistung; Ziel-SoC pro Batterie; Reservierung für Ladung wird vom „für Verbraucher verfügbar“ abgezogen (bei Priorität „Batterie zuerst“).
-- **Regeln:** Schwellwert-basierte Schaltung von Geräten (EIN/AUS ab Watt), Hysterese, Min.-Dauer, Verzögerung.
-- **States:** `surplus.powerW`, `surplus.availableForDevicesW`, `batteries.powerReservedW`, `consumption.totalW`, `grid.consumptionW` / `grid.feedInW`, `autarky.percent` usw. – für VIS, Dashboards und Skripte.
-- **Admin:** Konfiguration per JSON-UI; **Flow-Tab** mit grafischer Energiefluss-Ansicht (Haus, PV, Batterie, Netz, Werte in Echtzeit).
+- **Sources:** Multiple sources with types generation, consumption, grid power, feed-in – flexibly combinable (e.g. Shelly at main connection as grid power).
+- **Batteries:** Multiple storages with SoC, optional charge/discharge power; target SoC per battery; reserve for charging is subtracted from "available for consumers" (with "battery first" priority).
+- **Rules:** Threshold-based switching of devices (ON/OFF above watt), hysteresis, min. duration, delay.
+- **States:** `surplus.powerW`, `surplus.availableForDevicesW`, `batteries.powerReservedW`, `consumption.totalW`, `grid.consumptionW` / `grid.feedInW`, `autarky.percent`, etc. – for VIS, dashboards and scripts.
+- **Admin:** Configuration via JSON UI; **Flow tab** with graphical energy flow view (house, PV, battery, grid, live values).
 
-### Abkürzung SCC
+### SCC abbreviation
 
-**SCC = Self-Consumption Charging** (Eigenverbrauch & Laden): Der Fokus liegt darauf, den Solarüberschuss zuerst für Speicherladung und dann für Verbraucher zu nutzen – typisch für PV-Anlagen mit Batterie und steuerbaren Lasten (WP, Steckdosen).
+**SCC = Self-Consumption Charging**: Focus on using solar surplus first for storage charging, then for consumers – typical for PV systems with battery and controllable loads (heat pump, sockets).
 
 ---
 
 ## Installation
 
-Über ioBroker Admin: **Adapter** → **SCC** (PV-Überschuss-Steuerung) installieren.  
-Oder per CLI:
+Via ioBroker Admin: **Adapters** → **SCC** (PV surplus control) install.  
+Or via CLI:
 
 ```bash
 iobroker add scc
 ```
 
-**Node.js** mindestens 18.x.
+**Node.js** 18.x or higher.
 
 ---
 
-## Konfiguration
+## Configuration
 
-- **Quellen:** Datenpunkte mit Typ (Erzeugung, Verbrauch, Netzleistung, Einspeisung). Z. B. ein Shelly Pro 3 EM am Hausanschluss als **eine** Quelle „Netzleistung“ (negativ = Einspeisung).
-- **Batterien:** Pro Speicher SoC-State (%), optional Lade-/Entlade-State (W), Ziel-SoC, Name.
-- **Überschuss-Priorität:** „Batterie zuerst“ (Standard) oder „Geräte zuerst“.
-- **Regeln:** Pro Gerät Ziel-State (z. B. Shelly-Steckdose), **Geräteleistung (W)** (typ. Verbrauch), Schwellwert EIN/AUS (W), Hysterese, Min.-Dauer, Verzögerung. **EIN ab** sollte ≥ Geräteleistung + Puffer sein (z. B. Gerät 2000 W → EIN ab 2200 W), damit beim Einschalten kein Netz-/Batteriebezug entsteht; bei gesetzter Geräteleistung schaltet EIN nur, wenn „für Verbraucher verfügbar“ ≥ max(EIN ab, Geräteleistung).
-- **Optionen:** Schwellwert „Überschuss an“, Pauschale Batterie-Reserve (W), PV-Vorhersage (optional), Hausverbrauch aus Bilanz berechnen (optional).
+- **Sources:** States with type (generation, consumption, grid power, feed-in). E.g. one Shelly Pro 3 EM at main connection as **one** source "Grid power" (negative = feed-in).
+- **Batteries:** Per storage SoC state (%), optional charge/discharge state (W), target SoC, name.
+- **Surplus priority:** "Battery first" (default) or "Devices first".
+- **Rules:** Per device target state (e.g. Shelly socket), **device power (W)** (typical consumption), ON/OFF threshold (W), hysteresis, min. duration, delay. **ON above** should be ≥ device power + margin (e.g. 2000 W device → ON above 2200 W) so no grid/battery is used when switching on; with device power set, ON only switches when "available for consumers" ≥ max(ON above, device power).
+- **Options:** "Surplus active" threshold, fixed battery reserve (W), PV forecast (optional), compute consumption from balance (optional).
 
-Details und Datenmodell siehe [CONCEPT.md](CONCEPT.md).
-
----
-
-## Wichtige States (Beispiele)
-
-| State | Beschreibung |
-|-------|--------------|
-| `surplus.powerW` | Brutto-Überschuss (W) |
-| `surplus.availableForDevicesW` | Für Verbraucher verfügbar (W), nach Batterie-Reserve |
-| `surplus.feedInW` | Einspeisung (W) |
-| `batteries.powerReservedW` | Für Batterieladung reservierte Leistung (W) |
-| `batteries.allCharged` | Alle Batterien ≥ Ziel-SoC |
-| `consumption.totalW` | Hausverbrauch gesamt (W) |
-| `grid.consumptionW` / `grid.feedInW` | Netzbezug / Netzeinspeisung (W) |
-| `autarky.percent` | Autarkie (%) |
-| `rules.<id>.state` | Gerät ein/aus (boolean) |
+Details and data model: [CONCEPT.md](CONCEPT.md).
 
 ---
 
-## Flow-Tab
+## Important states (examples)
 
-Unter **Adapter-Instanz → Tab „Flow“** gibt es eine grafische Ansicht:
-
-![PV-Überschuss – Energiefluss (Flow-Dashboard)](docs/screenshot-flow.png)
-
-- Haus-Diagramm mit PV, Batterie, Netz, Hausverbrauch
-- Animierte Energiefluss-Linien (grün/rot nach Logik)
-- Live-Werte: Photovoltaik, Last, Batterie, Netz (Einspeisung/Bezug)
-- Autarkie, Energieverteilung (Brutto → Batterie → Verbraucher), Leistungsverteilung, Übersicht, Quellen, Batterien, Geräte, PV-Vorhersage
-
-Die Daten kommen aus den Adapter-States; bei fehlender Verbindung (z. B. in manchen Admin-Umgebungen) wird ein Hinweis angezeigt.
-
-- **Als Einzelseite öffnen:** Im Flow-Tab öffnet der Button „Als Einzelseite öffnen“ die Ansicht in einem neuen Fenster (z. B. für zweiten Bildschirm oder Vollbild).
-- **Standalone (ohne Admin):** In der Adapter-Konfiguration kann ein **Standalone-Port** (z. B. 8095) gesetzt werden. Dann ist die Flow-Seite direkt unter `http://<ioBroker-Host>:<Port>/flow.html` erreichbar – ohne Admin-Login.
+| State | Description |
+|-------|-------------|
+| `surplus.powerW` | Gross surplus (W) |
+| `surplus.availableForDevicesW` | Available for consumers (W), after battery reserve |
+| `surplus.feedInW` | Feed-in (W) |
+| `batteries.powerReservedW` | Power reserved for battery charging (W) |
+| `batteries.allCharged` | All batteries ≥ target SoC |
+| `consumption.totalW` | Total household consumption (W) |
+| `grid.consumptionW` / `grid.feedInW` | Grid import / feed-in (W) |
+| `autarky.percent` | Self-sufficiency (%) |
+| `rules.<id>.state` | Device on/off (boolean) |
 
 ---
 
-## Versionierung
+## Flow tab
 
-Bei der Entwicklung von ioBroker wird **SemVer (Semantic Versioning)** verwendet ([semver.org](https://semver.org/)).
+Under **Adapter instance → "Flow" tab** there is a graphical view:
 
-- **Version** steht in `package.json` und in `io-package.json` unter `common.version` – beide müssen **gleich** sein (`x.y.z`).
-- **Major (x.0.0):** Inkompatible API- oder Konfigurationsänderungen.
-- **Minor (0.x.0):** Neue Funktionen, abwärtskompatibel.
-- **Patch (0.0.x):** Bugfixes, abwärtskompatibel.
+![PV surplus – Energy flow (Flow dashboard)](docs/screenshot-flow.png)
 
-### Automatische Synchronisation
+- House diagram with PV, battery, grid, household consumption
+- Animated energy flow lines (green/red by logic)
+- Live values: photovoltaics, load, battery, grid (feed-in/import)
+- Self-sufficiency, energy distribution (gross → battery → consumers), power distribution, overview, sources, batteries, devices, PV forecast
 
-Beim Anheben der Version mit **npm** wird `io-package.json` automatisch angepasst:
+Data comes from adapter states; if the connection is missing (e.g. in some Admin setups), a notice is shown.
+
+- **Open as single page:** In the Flow tab, the "Open as single page" button opens the view in a new window (e.g. for a second screen or fullscreen).
+- **Standalone (without Admin):** In the adapter configuration a **standalone port** (e.g. 8095) can be set. Then the Flow page is available at `http://<ioBroker-host>:<port>/flow.html` – without Admin login.
+
+---
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for version history and changes.
+
+---
+
+## Versioning
+
+ioBroker development uses **SemVer (Semantic Versioning)** ([semver.org](https://semver.org/)).
+
+- **Version** is in `package.json` and in `io-package.json` under `common.version` – both must **match** (`x.y.z`).
+- **Major (x.0.0):** Incompatible API or configuration changes.
+- **Minor (0.x.0):** New features, backward compatible.
+- **Patch (0.0.x):** Bug fixes, backward compatible.
+
+### Automatic sync
+
+When bumping the version with **npm**, `io-package.json` is updated automatically:
 
 ```bash
 npm version patch   # 0.3.0 → 0.3.1
@@ -107,14 +113,14 @@ npm version minor   # 0.3.1 → 0.4.0
 npm version major   # 0.4.0 → 1.0.0
 ```
 
-Das Skript `scripts/sync-version.js` läuft im **version**-Lifecycle und überträgt die neue Version aus `package.json` nach `io-package.json`. Danach: Eintrag in `CHANGELOG.md` ergänzen und ggf. committen/taggen.
+The script `scripts/sync-version.js` runs in the **version** lifecycle and copies the new version from `package.json` to `io-package.json`. Then: add an entry to `CHANGELOG.md` and optionally commit/tag.
 
 ---
 
-## Lizenz
+## License
 
-MIT License. Siehe [LICENSE](LICENSE).
+MIT License. See [LICENSE](LICENSE).
 
 ---
 
-*Teile dieses Projekts wurden unter Nutzung von KI-Assistenten (z. B. für Code und Dokumentation) entwickelt.*
+*Parts of this project were developed with the help of AI assistants (e.g. for code and documentation).*

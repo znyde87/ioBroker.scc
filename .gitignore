@@ -20,3 +20,4 @@ Thumbs.db
 *.log
 tmp/
 scc-start-marker.txt
+.commitinfo
