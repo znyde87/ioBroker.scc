@@ -1672,7 +1672,15 @@
                                     row.addEventListener('click', function (e) {
                                         if (e.target.classList && (e.target.classList.contains('scc-picker-toggle') || e.target.classList.contains('scc-picker-icon'))) return;
                                         var el = document.getElementById(pickerTargetInputId);
-                                        if (el) el.value = child.fullId;
+                                        if (el) {
+                                            var id = child.fullId;
+                                            var prefix = instanceId + '.';
+                                            if (id && id.indexOf(prefix) === 0) {
+                                                var rest = id.slice(prefix.length);
+                                                if (/^[a-zA-Z0-9_-]+\.[0-9]+\../.test(rest)) id = rest;
+                                            }
+                                            el.value = id;
+                                        }
                                         closePicker();
                                     });
                                 } else {

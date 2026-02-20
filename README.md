@@ -88,6 +88,17 @@ Data comes from adapter states; if the connection is missing (e.g. in some Admin
 
 ---
 
+## Troubleshooting
+
+### "State … has no existing object"
+
+This warning appears when a rule (e.g. PID output) writes to a state that has no object in the ioBroker database. **This adapter does not create any state for switching** – it only writes to the state you configure (socket, dimmer 0–100%, etc.). That state belongs to the device adapter (e.g. Shelly).
+
+- **Correct state ID:** Use the **device adapter’s** state, e.g. `shelly.0.shelly0110dimg3#e4b063e3caa4#1.Light0.Brightness`, not a path under `scc.0` like `scc.0.shelly.0....` (that can happen if the picker stored the wrong ID). Edit the rule and set the output/target state to the real Shelly (or other device) state.
+- **Object missing:** The device adapter (e.g. Shelly) must create the object when the device is added. Update the device adapter, restart it, or in the ioBroker Admin object view check that the state has an object; recreate the device if needed.
+
+---
+
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for version history and changes.
