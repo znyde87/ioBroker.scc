@@ -10,6 +10,20 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/).
 
 ## [Unreleased]
 
+## [0.3.4] – 2026-02-20
+
+### Fixed / Behoben
+
+- **EN:** Flow tab object picker: when the admin returns state IDs with instance prefix (e.g. `scc.0.shelly.0....`), the selected ID is now normalized to the real device state (e.g. `shelly.0....`) so rules write to the correct state and the "has no existing object" warning is avoided.  
+  **DE:** Flow-Tab Objekt-Picker: Liefert der Admin State-IDs mit Instanz-Prefix (z. B. `scc.0.shelly.0....`), wird die gewählte ID nun auf den echten Geräte-State (z. B. `shelly.0....`) normalisiert, damit Regeln in den richtigen State schreiben und die Meldung „has no existing object“ entfällt.
+
+### Changed / Geändert
+
+- **EN:** README troubleshooting clarifies that this adapter does not create any state for switching; the configured output/target state belongs to the device adapter (e.g. Shelly).  
+  **DE:** README Fehlerbehebung: Dieser Adapter legt keinen State zum Schalten an; der konfigurierte Ausgangs-/Ziel-State gehört zum Geräte-Adapter (z. B. Shelly).
+
+---
+
 ## [0.3.3] – 2026-02-20
 
 ### Changed / Geändert

@@ -88,6 +88,17 @@ Die Daten kommen aus den Adapter-States; bei fehlender Verbindung (z. B. in ma
 
 ---
 
+## Fehlerbehebung
+
+### „State … has no existing object“
+
+Diese Meldung erscheint, wenn eine Regel (z. B. PID-Ausgang) in einen State schreibt, zu dem noch kein Objekt in der ioBroker-Datenbank existiert. **Dieser Adapter legt keinen eigenen State zum Schalten an** – er schreibt nur in den von dir konfigurierten State (Steckdose, Dimmer 0–100 % usw.). Dieser State gehört zum Geräte-Adapter (z. B. Shelly).
+
+- **Richtige State-ID:** Den State des **Geräte-Adapters** verwenden, z. B. `shelly.0.shelly0110dimg3#e4b063e3caa4#1.Light0.Brightness`, nicht einen Pfad unter `scc.0` wie `scc.0.shelly.0....` (kann vorkommen, wenn der Picker die ID falsch gespeichert hat). Regel bearbeiten und Ausgang/Ziel-State auf den echten Shelly- (bzw. Geräte-)State setzen.
+- **Objekt fehlt:** Der Geräte-Adapter (z. B. Shelly) muss das Objekt beim Anlegen des Geräts erstellen. Adapter aktualisieren, neu starten oder im ioBroker-Admin in der Objektansicht prüfen, ob der State ein Objekt hat; ggf. Gerät neu anlegen.
+
+---
+
 ## Versionierung
 
 Bei der Entwicklung von ioBroker wird **SemVer (Semantic Versioning)** verwendet ([semver.org](https://semver.org/)).
