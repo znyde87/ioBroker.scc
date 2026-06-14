@@ -107,6 +107,8 @@ See [CHANGELOG.md](CHANGELOG.md) for version history and changes.
 
 ---
 
+[Older changelogs can be found there](CHANGELOG_OLD.md)
+
 ## Versioning
 
 ioBroker development uses **SemVer (Semantic Versioning)** ([semver.org](https://semver.org/)).
