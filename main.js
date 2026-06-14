@@ -22,8 +22,8 @@ process.on('unhandledRejection', (reason, promise) => {
 // Marker beim Laden schreiben (Controller hat main.js dann geladen)
 function sccMarker(phase) {
     try {
-        const fs = require('fs');
-        const path = require('path');
+        const fs = require('node:fs');
+        const path = require('node:path');
         const file = path.join(__dirname, 'scc-start-marker.txt');
         fs.appendFileSync(file, new Date().toISOString() + ' ' + phase + '\n');
     } catch (_) {}
