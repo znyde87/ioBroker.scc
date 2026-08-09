@@ -14,7 +14,7 @@
     "typescript": "^7.0.2",
     "vite": "^6.0.0",
     "vite-plugin-commonjs": "^0.10.4",
-    "vite-tsconfig-paths": "^5.1.4"
+    "vite-tsconfig-paths": "^6.1.1"
   },
   "scripts": {
     "build": "tsc && node node_modules/vite/bin/vite.js build"
